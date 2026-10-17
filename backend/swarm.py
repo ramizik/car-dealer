@@ -75,6 +75,30 @@ def emit(agent: str, type_: str, text: str, data: dict | None = None) -> None:
                    "type": type_, "text": text, "data": data})
 
 
+# Demo names for the admin page. Each agent is shown as working when its job is running now.
+ROSTER = [
+    {"name": "Sam", "role": "Scout", "phase": "scouting"},
+    {"name": "Priya", "role": "Appraiser", "phase": "valuing"},
+    {"name": "Marcus", "role": "Buyer agent", "phase": "sourcing"},
+    {"name": "Ivy", "role": "Librarian", "phase": "tidying memory"},
+    {"name": "Ruth", "role": "Logistics", "states": ["in_transit"]},
+    {"name": "Omar", "role": "Merchandiser", "states": ["delivered"]},
+    {"name": "Leo", "role": "Seller agent", "states": ["listed", "awaiting_sale"]},
+]
+
+
+def roster() -> dict:
+    """Who is working right now, from the shift phase and what the deals are doing."""
+    phase = _state["phase"]
+    states = {d.get("state") for d in DEALS.values()}
+    rows, working = [], 0
+    for a in ROSTER:
+        busy = (a.get("phase") == phase) or any(st in states for st in a.get("states", []))
+        working += busy
+        rows.append({"name": a["name"], "role": a["role"], "status": "working" if busy else "idle"})
+    return {"working": working, "total": len(ROSTER), "shift_phase": phase, "agents": rows, "demo_names": True}
+
+
 def _phase(phase: str, deal_id: str | None = None) -> None:
     _state["phase"], _state["deal"] = phase, deal_id
 

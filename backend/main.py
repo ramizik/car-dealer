@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 import html  # noqa: E402
+import hmac  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -263,6 +264,26 @@ def get_dealer():
 @app.get("/onboarding/questions")
 def onboarding_questions():
     return QUESTIONS
+
+
+@app.get("/admin/memory")
+def admin_memory(token: str = ""):
+    """Owner-only view of memory and cost. Off unless ADMIN_TOKEN is set in .env and the token matches."""
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or not hmac.compare_digest(token.encode(), expected.encode()):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    try:
+        ev = json.loads((Path(__file__).parent / "data" / "eval_result.json").read_text(encoding="utf-8"))
+    except Exception:
+        ev = None
+    return {
+        "brain": brain.stats(),
+        "eval": ev and {"seed": ev.get("seed"), "train_n": ev.get("train_n"), "heldout_n": ev.get("heldout_n"),
+                        "off": ev.get("off"), "on": ev.get("on"), "secs": ev.get("secs")},
+        "llm": llm.STATS,
+        "youcom": youcom.STATS,
+        "agents": swarm.roster(),
+    }
 
 
 @app.get("/inventory")
