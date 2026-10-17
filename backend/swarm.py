@@ -14,6 +14,7 @@ from pathlib import Path
 
 import agents
 import conversations
+import craigslist
 import librarian
 import live
 import memory_layer
@@ -122,6 +123,8 @@ def running() -> bool:
 
 
 def _title(l: dict) -> str:
+    if l.get("title"):  # real Craigslist listing
+        return l["title"]
     return f"{l.get('year', '')} {l.get('make', '')} {l.get('model', '')} · {int(l.get('miles') or 0) // 1000}k mi".strip()
 
 
@@ -369,6 +372,9 @@ async def _run(max_deals: int) -> None:
                 if scam:
                     batch = [x for x in batch if x["id"] != scam["id"]]
                     batch.insert(1, scam)
+            real = craigslist.load()
+            if real:  # real Craigslist listings replace the simulated ones; seller behaviour stays simulated
+                batch = [craigslist.as_scenario(x, real[i % len(real)]) for i, x in enumerate(batch)]
             for sc_i in batch:
                 if not _state["running"] or (_state["cap"] and _state["n"] >= _state["cap"]):
                     break

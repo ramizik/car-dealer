@@ -48,6 +48,24 @@ def fetch(max_price: int | None = None, query: str = "") -> list[dict]:
     return parse(r.text)
 
 
+def load() -> list[dict]:
+    """Saved listings with a usable price. Empty when no pull has run yet."""
+    try:
+        rows = json.loads(OUT.read_text(encoding="utf-8")).get("listings", [])
+    except Exception:
+        return []
+    return [r for r in rows if r.get("price") and 1000 <= r["price"] <= 60000 and r.get("url")]
+
+
+def as_scenario(sc: dict, row: dict) -> dict:
+    """Keep the simulated seller's behaviour. Take the real listing, asking price and link from Craigslist."""
+    ask = int(row["price"])
+    listing = {"title": row["title"], "city": row["location"] or "Stockton, CA", "url": row["url"],
+               "price": ask, "seller_id": sc["listing"]["seller_id"], "source": "craigslist"}
+    seller = {**sc["seller"], "ask": ask, "floor": min(sc["seller"]["floor"], round(ask * 0.85 / 50) * 50)}
+    return {**sc, "listing": listing, "seller": seller}
+
+
 def save(rows: list[dict], max_price: int | None, query: str) -> Path:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     doc = {"fetched_at": time.time(), "source": "craigslist", "query": query, "max_price": max_price,
