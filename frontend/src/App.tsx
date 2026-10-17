@@ -130,6 +130,12 @@ export default function App() {
     { label: "Your max", render: (d) => money(d.max_buy), numeric: true },
     { label: "Profit at max", render: (d) => (d.max_profit === undefined ? <span className="muted">—</span> : <span className={d.max_profit >= 0 ? "good" : "bad"}>{money(d.max_profit)}</span>), numeric: true },
     { label: "Resale estimate", render: quote },
+    {
+      label: "Listing",
+      render: (d) => (d.listing_url
+        ? <a href={d.listing_url} target="_blank" rel="noopener noreferrer">{d.listing_url.includes("craigslist") ? "Craigslist" : "Open"}</a>
+        : <span className="muted">—</span>),
+    },
   ];
   const buyingFilters: Filter[] = [
     { id: "all", label: "All", states: ["sourced", "appraised", "negotiating", "awaiting_approval"] },

@@ -125,6 +125,14 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           );
         })()}
 
+        {deal.listing_url && (
+          <p className="small">
+            <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">
+              {deal.listing_url.includes("craigslist") ? "Open this car on Craigslist" : "Open listing"}
+            </a>
+          </p>
+        )}
+
         <dl className="facts-grid">
           <Num label="Asking" value={money(deal.asking)} />
           <Num label="Your max" value={money(deal.max_buy)} />
