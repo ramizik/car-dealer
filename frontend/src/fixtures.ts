@@ -122,6 +122,30 @@ export const deals: Deal[] = [
     sold_for: 11650,
     chat: [],
   },
+  {
+    id: "D-093",
+    car: "2017 Ford F-150 XLT · 74k mi",
+    location: "Modesto, CA",
+    state: "sold",
+    asking: 23500,
+    max_buy: 22000,
+    bought_for: 21800,
+    list_price: 24990,
+    sold_for: 22900,
+    chat: [],
+  },
+  {
+    id: "D-090",
+    car: "2016 Nissan Altima SV · 91k mi",
+    location: "Stockton, CA",
+    state: "sold",
+    asking: 9800,
+    max_buy: 9200,
+    bought_for: 9300,
+    list_price: 10490,
+    sold_for: 8950,
+    chat: [],
+  },
 ];
 
 const t0 = 1760700000;

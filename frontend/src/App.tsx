@@ -6,6 +6,7 @@ import DealPanel from "./DealPanel";
 import DealsList, { type Column, type Filter } from "./DealsList";
 import EvalView from "./EvalView";
 import HomeView from "./HomeView";
+import MoneyView from "./MoneyView";
 import OnboardingView from "./OnboardingView";
 import { money, profit, stageLabel } from "./format";
 import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
@@ -23,7 +24,7 @@ const NAV: { id: Section; label: string; icon: string; mobile: boolean }[] = [
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
-  const [teamTab, setTeamTab] = useState<"memory" | "results">("memory");
+  const [teamTab, setTeamTab] = useState<"money" | "memory" | "results">("money");
   const [health, setHealth] = useState<Health>(fx.health);
   const [deals, setDeals] = useState<Deal[]>(fx.deals);
   const [events, setEvents] = useState<AgentEvent[]>(fx.events);
@@ -216,13 +217,16 @@ export default function App() {
             <div className="stack">
               <header className="page-head">
                 <h1>Insights</h1>
-                <p>What we've learned from your deals, and how much better it makes each one.</p>
+                <p>What you're making on each car, and what we've learned from your deals.</p>
               </header>
               <div className="seg seg-lg" role="group" aria-label="Insights view">
+                <button aria-pressed={teamTab === "money"} onClick={() => setTeamTab("money")}>Money</button>
                 <button aria-pressed={teamTab === "memory"} onClick={() => setTeamTab("memory")}>What we've learned</button>
                 <button aria-pressed={teamTab === "results"} onClick={() => setTeamTab("results")}>Performance</button>
               </div>
-              {teamTab === "memory" ? (
+              {teamTab === "money" ? (
+                <MoneyView deals={deals} />
+              ) : teamTab === "memory" ? (
                 <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />
               ) : (
                 <EvalView result={evalResult} onRun={() => api.runEval().then(refresh)} />
