@@ -23,6 +23,14 @@ llm._client = None  # mock mode: deterministic, no API calls
 import agents  # noqa: E402
 import brain  # noqa: E402
 import sim  # noqa: E402
+import dealer_memory  # noqa: E402
+import dealer_profile  # noqa: E402
+
+# Isolate negotiation skill: the dealer's per-car buy limit and learned model skips are business rules,
+# not tactics. Left on, every seller asking above the $30k limit can never close, whatever the tactic.
+_profile = dealer_profile.get
+dealer_profile.get = lambda: {**_profile(), "services": ["buy", "sell"], "buy_limit": 10**9}
+dealer_memory.should_skip = lambda car: (False, "")
 
 OUT = Path(__file__).parent / "data" / "eval_result.json"
 SEED = int(os.getenv("EVAL_SEED", "1"))
