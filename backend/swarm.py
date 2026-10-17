@@ -150,6 +150,9 @@ async def _scout() -> None:
          {"count": len(found), "citations": [{"url": l["url"], "title": _title(l)} for l in live[:4]]})
 
 
+RESEARCH_TOLERANCE = 0.25  # cited mid this far from the deal's comps = shown as a check, not used for price
+
+
 async def _appraise(deal: dict) -> None:
     """Appraiser: You.com research (lite, search fallback) -> Nano extracts a range; keeps the sim range if it
     disagrees. Also a You.com check on the VIN for stolen/salvage/scam reports."""
@@ -165,9 +168,17 @@ async def _appraise(deal: dict) -> None:
             raise ValueError("no research")
         v = await llm.chat_json(APPRAISE_SYSTEM, r["content"][:4000], tier=tier_for("appraiser"))
         lo, mid, hi = (int(v.get(k) or 0) for k in ("low", "mid", "high"))
-        if not (0 < lo <= mid <= hi) or abs(mid - deal["valuation"]["mid"]) > deal["valuation"]["mid"] * 0.6:
-            raise ValueError("implausible")  # sim prices rule the deal; research must roughly agree
-        deal["valuation"].update(low=lo, mid=mid, high=hi, issues=v.get("issues") or [])
+        if not (0 < lo <= mid <= hi):
+            raise ValueError("implausible")
+        if abs(mid - deal["valuation"]["mid"]) > deal["valuation"]["mid"] * RESEARCH_TOLERANCE:
+            # Sim prices rule the deal, but the cited range is shown as an independent check, never hidden.
+            deal["valuation"]["research"] = {"low": lo, "mid": mid, "high": hi}
+            deal["valuation"]["issues"] = (v.get("issues") or []) + (
+                [f"asking ${deal['asking']:,} is above the cited ${lo:,}-${hi:,} range"] if deal["asking"] > hi else [])
+            brain.write("appraiser", "market", f"research:{key[6:]}", "obs", float(mid), attr="cited_mid", confidence=0.7,
+                        source=deal["valuation"]["citations"][0]["url"] if deal["valuation"]["citations"] else "you.com")
+        else:
+            deal["valuation"].update(low=lo, mid=mid, high=hi, issues=v.get("issues") or [])
     except Exception:
         pass
     val = deal["valuation"]

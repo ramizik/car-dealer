@@ -152,7 +152,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
   );
 }
 
-function Valuation({ low, mid, high, citations }: NonNullable<Deal["valuation"]>) {
+function Valuation({ low, mid, high, citations, research, issues }: NonNullable<Deal["valuation"]>) {
   const span = high - low || 1;
   const at = Math.min(100, Math.max(0, ((mid - low) / span) * 100));
   return (
@@ -163,6 +163,10 @@ function Valuation({ low, mid, high, citations }: NonNullable<Deal["valuation"]>
         <span className="mid" style={{ left: `${at}%` }} />
       </div>
       <div className="range-labels"><span>{money(low)}</span><span>{money(high)}</span></div>
+      {research && (
+        <p className="small muted">You.com sources say {money(research.low)} to {money(research.high)} (most likely {money(research.mid)}).</p>
+      )}
+      {issues && issues.length > 0 && <p className="small">Check: {issues.join("; ")}</p>}
       <ul className="sources">
         {citations.map((c) => (
           <li key={c.url}>

@@ -55,7 +55,7 @@ export type Deal = {
   bought_for?: number;
   list_price?: number;
   sold_for?: number;
-  valuation?: { low: number; mid: number; high: number; citations: Citation[] };
+  valuation?: { low: number; mid: number; high: number; citations: Citation[]; research?: { low: number; mid: number; high: number }; issues?: string[] };
   chat: ChatTurn[];
   live?: boolean;
   turn?: Turn;
