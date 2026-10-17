@@ -302,6 +302,8 @@ async def _one(i: int, sc: dict) -> None:
         _state["live_done"] = True
     deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
             "asking": sc["seller"]["ask"], "max_buy": round(max_buy), "listing_url": listing.get("url"),
+            # Profit if we pay exactly the max: expected resale (same SELL_FACTOR and RECON as the sales desk) minus max and recon.
+            "max_profit": round(round(comps * seller_agent.SELL_FACTOR, -1) - max_buy - seller_agent.RECON),
             "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []},
             "chat": [], "live": is_live, "turn": None}
     DEALS[deal_id], _SC[deal_id] = deal, sc

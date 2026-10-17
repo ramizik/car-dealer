@@ -152,6 +152,7 @@ export default function App() {
     { label: "Asking", render: (d) => money(d.asking), numeric: true },
     { label: "Our offer", render: (d) => money(d.offer), numeric: true },
     { label: "Your max", render: (d) => money(d.max_buy), numeric: true },
+    { label: "Profit at max", render: (d) => (d.max_profit === undefined ? <span className="muted">—</span> : <span className={d.max_profit >= 0 ? "good" : "bad"}>{money(d.max_profit)}</span>), numeric: true },
     { label: "Resale estimate", render: quote },
   ];
   const buyingFilters: Filter[] = [

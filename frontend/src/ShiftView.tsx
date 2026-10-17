@@ -227,6 +227,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
                   <strong>Buy {d.car.split(" · ")[0]} for {money(d.offer)}?</strong>
                   <p className="small muted">
                     Asked {money(d.asking)} · your max {money(d.max_buy)}
+                    {d.max_profit !== undefined && <> · profit at max <span className={d.max_profit >= 0 ? "good" : "bad"}>{money(d.max_profit)}</span></>}
                     {d.valuation && <> · worth about {money(d.valuation.mid)}</>}
                   </p>
                 </div>

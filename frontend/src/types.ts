@@ -52,6 +52,7 @@ export type Deal = {
   asking: number;
   offer?: number;
   max_buy: number;
+  max_profit?: number; // profit if we pay exactly max_buy
   bought_for?: number;
   list_price?: number;
   sold_for?: number;

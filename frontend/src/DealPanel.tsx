@@ -64,7 +64,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
             <div className="decision">
               <div>
                 <h3>Buy for {money(deal.offer)}?</h3>
-                <p>Your max is {money(deal.max_buy)}. Nothing is bought until you approve.</p>
+                <p>Your max is {money(deal.max_buy)}{deal.max_profit !== undefined && <> · profit at max about <span className={deal.max_profit >= 0 ? "good" : "bad"}>{money(deal.max_profit)}</span></>}. Nothing is bought until you approve.</p>
               </div>
               <div className="actions">
                 <button onClick={() => onDecide(deal.id, false)}>Decline</button>
@@ -77,6 +77,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
         <dl className="facts-grid">
           <Num label="Asking" value={money(deal.asking)} />
           <Num label="Your max" value={money(deal.max_buy)} />
+          {deal.max_profit !== undefined && <Num label="Profit at max" value={money(deal.max_profit)} />}
           <Num label="Our offer" value={money(deal.offer)} />
           <Num label="Paid" value={money(deal.bought_for)} />
           <Num label="Shipping" value={money(deal.shipping)} />
