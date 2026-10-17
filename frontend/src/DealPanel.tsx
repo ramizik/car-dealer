@@ -58,14 +58,16 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           );
         })()}
 
-        {/* Every step of the deal, so it is clear where this car is. */}
-        <ol className="steps" aria-label="Deal steps">
+        {/* Every step of the deal, top to bottom, so it is clear where this car is. */}
+        <ol className="rail" aria-label="Deal steps">
           {STAGES.map((s, i) => {
             const at = stopped ? -1 : step;
             const cls = i < at ? "done" : i === at ? "now" : "todo";
             return (
               <li key={s.state} className={cls} aria-current={cls === "now" ? "step" : undefined}>
-                <span aria-hidden>{cls === "done" ? "✓" : cls === "now" ? "●" : "○"}</span> {s.label}
+                <span className="rail-dot" aria-hidden />
+                {s.label}
+                {cls === "now" && <span className="rail-tag">Now</span>}
               </li>
             );
           })}
@@ -158,28 +160,35 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           <section aria-labelledby="conversation">
             <h3 id="conversation">Conversation</h3>
             <div className="chat">
-              {deal.chat.map((t, i) => (
-                <div key={i} className={`bubble ${t.from === "agent" ? "ours" : ""}`}>
-                  <span className="who">
-                    {t.from === "agent" ? "You (via us)" : t.from === "buyer" ? "Buyer" : "Seller"}
-                    {t.channel && <span className="tag channel">{CHANNEL_LABELS[t.channel] ?? t.channel}</span>}
-                    {t.tactic && <span className="tag">{t.tactic.replace(/_/g, " ")}</span>}
-                  </span>
-                  <p>{t.text}</p>
-                  {t.audio_url && (
-                    // Autoplay only the newest clip while the agent's line is the one just spoken; browsers may still block it.
-                    <audio controls preload="auto" src={api.clipUrl(t.audio_url)} autoPlay={i === lastAudio && deal.turn?.who === "seller"} />
-                  )}
-                  {t.recalled && t.recalled.length > 0 && (
-                    <div className="memory">
-                      Based on past deals
-                      <div className="chips">
-                        {t.recalled.map((r) => <span key={r} className="chip">{r}</span>)}
-                      </div>
+              {deal.chat.map((t, i) => {
+                // Our side sits on the right in brand colour; seller and buyer sit left, each with its own tint.
+                const side = t.from === "agent" ? "dealer" : t.from === "buyer" ? "buyer" : "seller";
+                return (
+                  <div key={i} className={`turn turn-${side}`}>
+                    <span className={`avatar av-${side}`} aria-hidden>{AVATAR[side]}</span>
+                    <div className={`bubble bubble-${side}`}>
+                      <span className="who">
+                        <strong>{WHO[side]}</strong>
+                        {t.channel && <span className="tag channel">{CHANNEL_LABELS[t.channel] ?? t.channel}</span>}
+                        {t.tactic && <span className="tag">{t.tactic.replace(/_/g, " ")}</span>}
+                      </span>
+                      <p>{t.text}</p>
+                      {t.audio_url && (
+                        // Autoplay only the newest clip while the agent's line is the one just spoken; browsers may still block it.
+                        <audio controls preload="auto" src={api.clipUrl(t.audio_url)} autoPlay={i === lastAudio && deal.turn?.who === "seller"} />
+                      )}
+                      {t.recalled && t.recalled.length > 0 && (
+                        <div className="memory">
+                          Based on past deals
+                          <div className="chips">
+                            {t.recalled.map((r) => <span key={r} className="chip">{r}</span>)}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
@@ -187,11 +196,14 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
         <section aria-labelledby="history">
           <h3 id="history">History</h3>
           {history.length === 0 && <p className="empty">Nothing recorded for this car yet.</p>}
-          <ol className="history">
+          <ol className="timeline">
             {history.map((e) => (
-              <li key={e.id} className={e.type === "blocked" ? "blocked" : ""}>
-                <span className="who">{time(e.ts)}</span>
-                {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
+              <li key={e.id} className={`tl tl-${kind(e)}`}>
+                <span className="tl-dot" aria-hidden />
+                <span className="who">
+                  {time(e.ts)}
+                  {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
+                </span>
                 {e.text}
               </li>
             ))}
@@ -210,9 +222,13 @@ function Valuation({ low, mid, high, citations, research, issues }: NonNullable<
       <h3 id="market">Market value</h3>
       <p>Most likely <strong>{money(mid)}</strong>, usually between {money(low)} and {money(high)}.</p>
       <div className="range" role="img" aria-label={`Most likely ${money(mid)} within ${money(low)} to ${money(high)}`}>
-        <span className="mid" style={{ left: `${at}%` }} />
+        <div className="range-fill" />
+        <span className="range-mark" style={{ left: `${at}%` }}><span>{money(mid)}</span></span>
       </div>
-      <div className="range-labels"><span>{money(low)}</span><span>{money(high)}</span></div>
+      <div className="range-labels">
+        <span><span className="small muted">Low</span><b>{money(low)}</b></span>
+        <span><span className="small muted">High</span><b>{money(high)}</b></span>
+      </div>
       {research && (
         <p className="small muted">You.com sources say {money(research.low)} to {money(research.high)} (most likely {money(research.mid)}).</p>
       )}
@@ -226,6 +242,18 @@ function Valuation({ low, mid, high, citations, research, issues }: NonNullable<
       </ul>
     </section>
   );
+}
+
+const WHO = { dealer: "You (via us)", seller: "Seller", buyer: "Buyer" } as const;
+const AVATAR = { dealer: "D", seller: "S", buyer: "B" } as const;
+
+// Colour-coded history: state changes, messages, approvals, blocks and quiet memory steps.
+function kind(e: AgentEvent): "blocked" | "attn" | "state" | "message" | "muted" {
+  if (e.type === "blocked" || e.type === "error") return "blocked";
+  if (e.type === "approval") return "attn";
+  if (e.type === "state") return "state";
+  if (e.type === "message" || e.type === "outreach" || e.type === "callback") return "message";
+  return "muted";
 }
 
 function Num({ label, value }: { label: string; value: string }) {
