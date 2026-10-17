@@ -1,6 +1,34 @@
 # Dealer: 6-hour build roadmap (Shared Brain track)
 
-**Status (T+?, 2026-10-17):** P0 mostly done. P1 Lanes B + D done; Lane A (NemoClaw) not started in repo. P2: negotiator + classifier done, dashboard on fixtures done; swarm, API, approval, scout/appraise todo. P3 to P5 todo. Smoke (mock LLM, sim.py, 60 train / 30 held-out): surplus OFF 0.86 -> ON 0.90; with only 20 train the gain is noise, so eval should use 60+ train.
+**Status (2026-10-17, updated after the NVIDIA setup):** P0 to P3 are done in code, and P4 (the eval number) is measured. Crusoe, You.com, NemoClaw on the droplet, and the brain OFF vs ON eval all run. The live seller flow and NVIDIA speech are built and their pieces pass, but the full live shift in the browser is not yet verified. P5 (hardening, rehearsals, backup video) has not started. Details in "Current state" below.
+
+## Current state (2026-10-17)
+
+**Works (verified in this repo or on the droplet):**
+- Brain, LLM tiers with throttle and backoff, You.com wrapper with disk cache, simulator (`sim.py`). Offline tests: `test_brain.py` and `test_memory_tiers.py` pass.
+- Eval: `EVAL_SEED=1` and `EVAL_SEED=2`, `SIM_FAST=1 python eval.py`, about 20 s, brain OFF vs ON on 10 held-out sellers. Seed 1 is stored in `backend/data/eval_result.json`.
+- Full autonomous shift in `swarm.py` with `ops.py`: scout, appraise, negotiate, approval, logistics, storefront, sell, librarian. Restart resumes from `data/state.json`.
+- Real Craigslist listings in the scout (`craigslist.py`, `gen_inventory.py`), with synthetic inventory as the demo pool.
+- NemoClaw concierge in the sandbox on the droplet: start shift, briefing, scam domain blocked.
+- NVIDIA speech and embeddings pass `python backend/nvidia_check.py`: key, Parakeet ASR (`parakeet-tdt-0_6b-v2`), Magpie TTS (`Magpie-Multilingual.EN-US.Aria`), a TTS to ASR round trip, and embeddings (`nvidia/nemotron-3-embed-1b`).
+- Live seller (`live.py`): the first deal of a live shift waits for the seller's answer from the browser. Endpoints `POST /deals/{id}/seller-audio`, `POST /deals/{id}/seller-text`, `GET /clips/{id}.wav`. Times out to the simulated seller after 120 s.
+- Twilio phone line removed (`fa79d08`).
+
+**Not tested yet:**
+- The live shift in the browser: recording with the mic, the turn banner, agent audio playback, and the typed fallback. The UI could not be started in this session, so this is the top risk.
+- The live path with real speech: browser WAV to Parakeet, and agent lines to Magpie inside a real negotiation. Only the standalone round trip has run.
+- Mic access on a non-localhost origin. The browser requires HTTPS there, and nothing is set up for it.
+- The droplet frontend: the dashboard is not served from the droplet yet, so the demo runs from a laptop on localhost against the droplet API (or the backend locally).
+- Eval with seeds beyond 1 and 2, and the eval transcripts review (4.4 and 4.5).
+- Degraded mode (5.2): no automatic switch to mock text after repeated LLM failures.
+- `DEMO_MODE=1` end to end on a fresh clone.
+
+**Next steps, in order:**
+1. Run `python backend/nvidia_check.py` on the machine that will do the demo, then run one live shift on localhost with "I answer as the first seller" ticked. Record the seller answer with the mic and by typing. Fix whatever breaks.
+2. Check the droplet path: either serve the frontend and tunnel the API, or run the backend locally against the droplet concierge.
+3. Degraded mode (5.2) and a `DEMO_MODE=1` dry run (5.1, 5.3).
+4. Two rehearsals and a backup video (5.5). Pre-flight checklist (5.6).
+5. Decide on 4.4 and 4.5: read three transcripts per condition, and run seeds 3 and 4 if time allows. Never tune the simulator to the held-out set.
 
 Companion to `docs/project-idea.md`. Crusoe endpoint, model IDs and rate limits: `.claude/skills/crusoe-recursive-agents-hackathon/SKILL.md` (source of truth). Times are hackathon clock, **T+0:00 to T+6:00**.
 Every step has an owner lane, the file it touches. If a step's timebox runs out, take its fallback and move on.
@@ -52,12 +80,12 @@ Step IDs keep their original lane letter (A/B/C/D) so history stays readable. A 
 | Done | # | Lane | Step |
 |---|---|---|---|
 | [ ]  0.1 | All | Read `docs/project-idea.md` §1, §6, §10 together (5 min). Agree on demo persona "Joe's Auto, Stockton CA". |
-| [ ]  0.2 | A | **Start the NemoClaw install now. It's the longest pole.** Pick the host: a Linux machine, or Windows 11 + WSL2 Ubuntu + Docker. Install OpenShell, then NemoClaw, following the official quickstart. Run `nemoclaw host probe`. |
+| [x]  0.2 | A | **Start the NemoClaw install now. It's the longest pole.** Pick the host: a Linux machine, or Windows 11 + WSL2 Ubuntu + Docker. Install OpenShell, then NemoClaw, following the official quickstart. Run `nemoclaw host probe`. |
 | [x]  0.3 | B | Read the Crusoe skill (§6 rate limits, §12 troubleshooting). Fix `.env.example`: `CRUSOE_BASE_URL=https://api.inference.crusoecloud.com/v1`, because the old `api.crusoe.ai` host causes 429s. Copy it to `.env` and add `CRUSOE_API_KEY`. Run `GET /v1/models` and record the **exact** IDs plus `features` (tool_calling, structured_outputs) for Super, Lightning, Nano, Nano Omni, and Ultra if listed. Time one chat call per model. **Add a payment method to the Crusoe project if possible: 30 RPM per model without one, 600 with one.** |
-| [ ]  0.4 | D | Get the You.com key. `curl` all three endpoints with header `X-API-Key`: `POST https://ydc-index.io/v1/search`, `POST https://ydc-index.io/v1/contents`, `POST https://api.you.com/v1/research` (`research_effort: "lite"`). Time Research. |
+| [x]  0.4 | D | Get the You.com key. `curl` all three endpoints with header `X-API-Key`: `POST https://ydc-index.io/v1/search`, `POST https://ydc-index.io/v1/contents`, `POST https://api.you.com/v1/research` (`research_effort: "lite"`). Time Research. _Live: search, contents and research all run in shifts (2026-10-17)._ |
 | [x]  0.5 | C | `npm install`, run the frontend, and confirm the current boilerplate renders against the backend in mock mode. |
 | [x]  0.6 | B | Update `CLAUDE.md` context: the track is now **Shared Brain only**, and the layout section matches the files in this roadmap. |
-| [~]  0.7 | All | Agree on the **API contract** (§P2 table) and the **event shape**. C builds against fixtures and doesn't wait for B. |
+| [x]  0.7 | All | Agree on the **API contract** (§P2 table) and the **event shape**. C builds against fixtures and doesn't wait for B. |
 
 **Event shape (shared by everyone):**
 ```json
@@ -135,31 +163,30 @@ _Repo side done: `nemoclaw/SETUP.md` (runbook, docs-checked commands), `nemoclaw
 
 ### Status snapshot (2026-10-17)
 
-Working and pushed:
+Working in code:
 - `brain.py` (order-independent reducer, recall, snapshots) and `llm.py` (tiers, throttle, mock mode).
-- `youcom.py`: live Search, Contents and Research, a disk cache, and `DEMO_MODE` (32 real listings cached for Joe's 4 models).
-- `sim.py`: deterministic sellers, buyers and owner, with `scenarios(1, 30)` split 20/10.
-- `agents.negotiate`: segment classifier, tactic pick from the playbook, voice hooks, callback capture, and the scam-link block.
-- `voice.py`: Parakeet and Magpie on NVCF, plus `extract_phone` and `record_callback`. It falls back to text without `NVIDIA_API_KEY`.
-- `skills.py` plus `backend/skills/*/SKILL.md` (10 agents): read-before is wired into `negotiate`, and a scam link writes `buyer/outreach/MISTAKES.md`.
-- Frontend: dealer setup, plus Shift, Brain and Results tabs on fixtures.
+- `youcom.py`: live Search, Contents and Research, disk cache, `DEMO_MODE`.
+- `craigslist.py` and `gen_inventory.py`: real listings for the scout, synthetic inventory for the demo pool.
+- `sim.py`: deterministic sellers, buyers and owner. `scenarios(seed, n)` gives the 20 / 10 split.
+- `agents.negotiate`: segment classifier, tactic pick from the playbook, callback capture, scam-link block, voice hooks, live seller hook.
+- `swarm.py` + `ops.py`: scout, appraise, negotiate, approval, logistics, storefront, sell, librarian. `/shift/*` endpoints. `data/state.json` resume.
+- `live.py` + `voice.py`: live seller answer from the browser, Parakeet ASR, Magpie TTS, embeddings via `vector_memory.py`.
+- `skills.py` plus `backend/skills/*/SKILL.md`: read-before in `negotiate`, mistake log writes.
+- `eval.py`: brain OFF vs ON, `GET /eval`, `POST /eval/run`.
+- Frontend: sections Shift, Buying, Inventory, Selling, Insights, Setup on the live API, with dark mode and the deal drawer. The live-seller turn banner and recorder are built (`TurnBanner.tsx`, `SellerTurn.tsx`) but not yet tested in a browser.
 
-Connected (2026-10-17): full autonomous pipeline in `swarm.py` + `ops.py`: scout -> appraise -> negotiate -> approval -> logistics (You.com quote or brain median, simulated clock) -> merchandiser (listing copy, `GET /storefront`) -> sell. After-buy work runs in the background while the buy desk keeps negotiating. `max_deals: 0` = continuous shift until stopped; librarian (`librarian.py`) runs every 3 deals; `data/state.json` lets a restarted backend resume shipments and listings. `python reset_demo.py [cold|warm]` resets.
-
-Not connected yet (original list, mostly superseded):
-- There is no `swarm.py` and no `/shift/*` endpoints. `main.py` still serves the old `loop.py` `/run`.
-- `scout`, `appraise`, `owner_review`, `list`, `sell` and `logistics` don't exist yet. Each one should call `skills.load(<agent>)` and use the `youcom.*` functions.
-- `agent_tiers.tier_for` isn't used by any call yet.
-- `eval.py` (brain OFF vs ON, the headline number) is not started.
-- The UI still runs on fixtures, with no live API calls.
+Not done:
+- Ranking scout candidates by dealer notes (2.B2).
+- Degraded mode after repeated LLM failures (5.2).
+- The rehearsals, backup video and pre-flight checklist (P5).
 
 ### Lane B: Agents, shift loop, API
 
 | Done | # | Step | File |
 |---|---|---|---|
 | [~]  2.B1 | `agents.py`: one async function per role. **Each starts with `brain.recall(...)` and ends with `brain.write(...)`.** No exceptions. Reviewers grep for it. | `backend/agents.py` |
-| [ ]  2.B2 | `scout(profile)`: You.com search, then contents, then extract. Rank by fit using dealer facts and dealer notes (learned rejections). Output top N candidates. Writes `market` observations for listing prices. | same |
-| [ ]  2.B3 | `appraise(listing)`: You.com Research (`lite`) asks for the fair private-party value and common issues for this year/model/miles/region. The Nano model extracts `{low, mid, high, issues[], sources[]}`. Writes `market` observations **with source URLs**. `max_buy = min(dealer.max_pct * retail_mid, mid * (1 - margin_target))`. | same |
+| [~]  2.B2 | `scout(profile)`: You.com search, then contents, then extract. Rank by fit using dealer facts and dealer notes (learned rejections). Output top N candidates. Writes `market` observations for listing prices. _Live: You.com search and Craigslist listings, extracted and written to market. Ranking by dealer notes is not done._ | same |
+| [x]  2.B3 | `appraise(listing)`: You.com Research (`lite`) asks for the fair private-party value and common issues for this year/model/miles/region. The Nano model extracts `{low, mid, high, issues[], sources[]}`. Writes `market` observations **with source URLs**. `max_buy = min(dealer.max_pct * retail_mid, mid * (1 - margin_target))`. _In `swarm._appraise`: You.com Research, Nano extract, sim prices rule when research disagrees, VIN risk check, writes market with citations._ | same |
 | [x]  2.B4 | `classify_segment(seller_text)`: Nano returns `motivated_private \| price_anchored \| haggler \| wholesaler_repeat \| unknown`, with a keyword fallback. | same |
 | [x]  2.B5 | `negotiate(deal)` loop (≤6 rounds). Recall `party:seller`, `playbook:*|segment` and the dealer max. **Tactic pick:** brain ON uses the best win rate with ε=0.15 in training and 0 in eval; brain OFF uses the default `anchor_low`. The SMART model writes the offer and message given the tactic, comps and memory. **Clamp the offer to `max_buy` in code.** Add the AI-disclosure line. Write a party note (summary, signals), a playbook counter (tries/wins) and a party fact (the seller's last counter, which becomes the anchor for repeat sellers). | same |
 | [~]  2.B6 | `open_link(url)` tool. If seller text contains a URL, the negotiator "verifies" it with an `httpx` GET. On a proxy denial or connection error inside the sandbox, emit a `blocked` event ("Blocked by OpenShell policy") and write a `party` red-flag fact (confidence 0.9). Drop the deal. | same |
@@ -248,12 +275,12 @@ Not connected yet (original list, mostly superseded):
 
 | Done | # | Step | File |
 |---|---|---|---|
-| [ ]  4.1 | `eval.py`: `run(brain_enabled, scenarios)` drives `negotiate()` (and optionally scout→owner approval) with `SIM_FAST=1`. Parallelism comes from the per-model limiter in `llm.py` (1.B9). Same seeds in both conditions. **Call budget:** about 160 SMART calls (20 train + 2×10 held-out, ~4 rounds each). That takes ~6 min at 30 RPM and under 1 min at 600 RPM, so start the run early, or use a payment-method project. | `backend/eval.py` |
-| [ ]  4.2 | Protocol: (1) wipe the brain, (2) **train** on 20 scenarios with brain ON, ε=0.15, (3) snapshot `warm`, (4) **held-out** 10 with brain OFF, (5) **held-out** 10 with brain ON loaded from `warm`, ε=0. | same |
-| [ ]  4.3 | Metrics per condition: **surplus captured** `mean((ask-paid)/(ask-floor))` over closed deals, **close rate**, **mean rounds**, **owner approval rate** (if scout eval is on), and a **scam deals avoided** count. | same |
+| [x]  4.1 | `eval.py`: `run(brain_enabled, scenarios)` drives `negotiate()` (and optionally scout→owner approval) with `SIM_FAST=1`. Parallelism comes from the per-model limiter in `llm.py` (1.B9). Same seeds in both conditions. **Call budget:** about 160 SMART calls (20 train + 2×10 held-out, ~4 rounds each). That takes ~6 min at 30 RPM and under 1 min at 600 RPM, so start the run early, or use a payment-method project. | `backend/eval.py` |
+| [~]  4.2 | Protocol: (1) wipe the brain, (2) **train** on 20 scenarios with brain ON, ε=0.15, (3) snapshot `warm`, (4) **held-out** 10 with brain OFF, (5) **held-out** 10 with brain ON loaded from `warm`, ε=0. _Seeds 1 and 2 run as 20 train / 10 held-out; the warm snapshot step is not in the protocol yet._ | same |
+| [~]  4.3 | Metrics per condition: **surplus captured** `mean((ask-paid)/(ask-floor))` over closed deals, **close rate**, **mean rounds**, **owner approval rate** (if scout eval is on), and a **scam deals avoided** count. _Surplus, close rate, rounds and scam count are measured. Owner approval rate is not._ | same |
 | [ ]  4.4 | Run it. Read 3 transcripts per condition to make sure the gain comes from recall (tactic pick, repeat-seller anchor, learned preferences) and not from a bug. | — |
 | [ ]  4.5 | If the gain is noisy: increase held-out to 20 and/or run 3 seeds and report mean ± range. **Never tune the sim to the held-out set.** | — |
-| [ ]  4.6 | Freeze: commit `eval_results.json` and the `cold` / `warm` snapshots. The UI shows the frozen result by default, and the "Re-run" button runs live. | `backend/data/` (decide whether to un-ignore these few files) |
+| [~]  4.6 | Freeze: commit `eval_results.json` and the `cold` / `warm` snapshots. The UI shows the frozen result by default, and the "Re-run" button runs live. | `backend/data/` (decide whether to un-ignore these few files) |
 
 > Write the headline sentence now, using the measured values only: *"On 10 held-out deals, with the brain on, the team captured __% of the negotiable surplus vs __% with it off, and closed __/10 vs __/10."*
 
@@ -269,7 +296,7 @@ From here on: bug fixes, demo mode, copy, rehearsal. No new features. Anything u
 
 | Done | # | Lane | Step |
 |---|---|---|---|
-| [ ]  5.1 | B | `DEMO_MODE=1`: You.com from cache only, brain loads `cold` at shift start (so learning is visible) or `warm` for the Eval story, sim seeds fixed, simulated clock fast. |
+| [~]  5.1 | B | `DEMO_MODE=1`: You.com from cache only, brain loads `cold` at shift start (so learning is visible) or `warm` for the Eval story, sim seeds fixed, simulated clock fast. |
 | [ ]  5.2 | B | Crusoe outage fallback: if 2 consecutive LLM calls fail, switch to mock answers for the negotiation text and keep the deterministic prices. A banner reads "degraded". |
 | [ ]  5.3 | C | Demo script dry run #1 against §10 of `docs/project-idea.md`, timed. Note every stumble. |
 | [ ]  5.4 | All | Fix the stumbles from 5.3 only. |
