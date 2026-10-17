@@ -38,5 +38,6 @@ export const api = {
   startShift: (max_deals: number) => post("/shift/start", { max_deals }),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
+  storefrontUrl: `${API}/storefront`,
   loadSnapshot: (name: "cold" | "warm") => post(`/brain/load/${name}`),
 };

@@ -1,11 +1,15 @@
 """The shift: runs simulated deals end to end and keeps the state the dashboard reads.
 
-Each deal: seller negotiation (agents.negotiate) -> owner approval -> listing -> sale to a simulated buyer.
-Everything is in memory; /deals and /events serve it. Prices come from code and the sim, never the LLM.
+Each deal: scout -> appraise -> negotiate -> owner approval -> logistics -> merchandise -> sale to a simulated buyer.
+Continuous mode (max_deals=0) keeps working until stopped; the librarian compacts the brain every few deals.
+State is saved to data/state.json, so a restarted backend picks up shipments and listings where they were.
+Prices come from code and the sim, never the LLM.
 """
 import asyncio
+import json
 import random
 import time
+from pathlib import Path
 
 import agents
 import librarian
@@ -18,13 +22,46 @@ from agent_tiers import tier_for
 import dealer_profile
 import dealer_memory
 import seller_agent
+import ops
 import sim
 
 DEALS: dict[str, dict] = {}
 EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
 _state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
-          "phase": "idle", "deal": None}
+          "phase": "idle", "deal": None, "continuous": False}
+STATE_FILE = Path(__file__).parent / "data" / "state.json"
+_tasks: set = set()  # after-buy pipelines running alongside the next negotiation
+
+
+def save() -> None:
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"deals": DEALS, "events": EVENTS, "scenarios": _SC,
+                                   "state": {k: _state[k] for k in ("seed", "n")}}, default=str), encoding="utf-8")
+        tmp.replace(STATE_FILE)
+    except Exception:
+        pass  # persistence is a bonus; never break the shift over it
+
+
+def _restore() -> None:
+    if not STATE_FILE.exists():
+        return
+    try:
+        d = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    DEALS.update(d.get("deals", {}))
+    EVENTS.extend(d.get("events", []))
+    _SC.update(d.get("scenarios", {}))
+    _state.update(d.get("state", {}))
+    for deal in DEALS.values():  # work cut off mid-negotiation can't be resumed honestly
+        if deal["state"] in ("sourced", "appraised", "negotiating"):
+            deal.update(state="dropped", drop_reason="backend restarted mid-negotiation")
+
+
+_restore()
 
 
 def emit(agent: str, type_: str, text: str, data: dict | None = None) -> None:
@@ -52,7 +89,8 @@ brain.listeners.append(_on_brain)
 
 
 def status() -> dict:
-    return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal")}
+    return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal", "continuous")} | {
+        "background": len(_tasks)}
 
 
 def running() -> bool:
@@ -151,9 +189,41 @@ async def approve(deal_id: str, yes: bool, reason: str = "") -> bool:
     deal["state"] = "bought"
     emit("buyer", "state", f"Bought {deal['car']} for ${deal['bought_for']:,}", {"deal_id": deal_id, "price": deal["bought_for"]})
     deal["list_price"] = int(deal.pop("_resale", 0) or round(deal["bought_for"] * 1.15, -1))
-    deal["state"] = "listed"
-    await _sell(deal, sim.make_buyer(_SC[deal_id]))
+    _spawn(deal)
     return True
+
+
+def _spawn(deal: dict) -> None:
+    t = asyncio.get_running_loop().create_task(_after_buy(deal))
+    _tasks.add(t)
+    t.add_done_callback(_tasks.discard)
+
+
+async def _after_buy(deal: dict) -> None:
+    """Logistics -> merchandiser -> seller, in the background so the buy desk keeps negotiating."""
+    try:
+        if deal["state"] in ("bought", "in_transit"):
+            save()
+            await ops.logistics(deal, emit)
+            save()
+        if deal["state"] == "delivered":
+            await ops.merchandise(deal, emit)
+            save()
+        if deal["state"] == "listed":
+            await asyncio.sleep(ops.DAY_SECS)  # a few simulated days on the lot before the first buyer calls
+            await _sell(deal, sim.make_buyer(_SC[deal["id"]]))
+            save()
+    except Exception as e:
+        emit("system", "error", f"{deal['id']} after-buy step failed: {type(e).__name__}", {"deal_id": deal["id"]})
+
+
+def resume() -> int:
+    """On startup: restart shipments and listings that were in flight when the backend stopped."""
+    todo = [d for d in DEALS.values() if d["state"] in ("bought", "in_transit", "delivered", "listed") and d["id"] in _SC]
+    for d in todo:
+        emit("system", "state", f"Resumed {d['id']} after restart ({d['state']})", {"deal_id": d["id"]})
+        _spawn(d)
+    return len(todo)
 
 
 async def _one(i: int, sc: dict) -> None:
@@ -183,12 +253,14 @@ async def _one(i: int, sc: dict) -> None:
     emit("negotiator", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal_id, **mem})
     if not r["closed"]:
         deal.update(state="dropped", drop_reason=r.get("dropped") or "no deal")
+        save()
         return
     deal["offer"] = int(r["price"])
     deal["_resale"] = (r.get("resale_quote") or {}).get("resale_price")
     deal["state"] = "awaiting_approval"
     _phase("waiting for owner", deal_id)
     emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK", {"deal_id": deal_id})
+    save()
     if dealer_profile.get()["decision_mode"] != "dealer_decides":
         await approve(deal_id, True)
 
@@ -197,30 +269,39 @@ LIBRARIAN_EVERY = 3
 
 
 async def _run(max_deals: int) -> None:
+    """max_deals=0: continuous shift, fresh market scans and sellers until someone presses stop."""
     try:
-        _state["seed"] += 1
-        _state["cap"] = _state["n"] + max_deals
+        _state["continuous"] = max_deals == 0
+        _state["cap"] = 0 if max_deals == 0 else _state["n"] + max_deals
         _state["started"], _state["ended"] = time.time(), None
-        _phase("scouting")
-        try:
-            await _scout()
-        except Exception as e:
-            emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
-        sc = sim.scenarios(_state["seed"], max_deals * 4)
-        for sc_i in (sc["train"] + sc["heldout"]):
-            if _state["n"] >= _state["cap"]:
-                break
-            if not _state["running"]:
-                break
-            _phase("sourcing")
+        done_here = 0
+        emit("system", "state", "Shift started" + (" (continuous, runs until you stop it)" if not max_deals else f" ({max_deals} deals)"), {})
+        while _state["running"] and (not _state["cap"] or _state["n"] < _state["cap"]):
+            _state["seed"] += 1
+            _phase("scouting")
             try:
-                if await _one(_state["n"] + 1, sc_i) is not False:
-                    _state["n"] += 1
-                    if _state["n"] % LIBRARIAN_EVERY == 0:
-                        librarian.run(emit)  # distil lessons and tidy memory every few deals
-            except Exception as e:  # one bad deal must not stop the shift
-                emit("system", "error", f"Deal skipped: {type(e).__name__}", {})
-            await asyncio.sleep(0.5)
+                await _scout()
+            except Exception as e:
+                emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
+            sc = sim.scenarios(_state["seed"], max(max_deals, LIBRARIAN_EVERY) * 4)
+            for sc_i in (sc["train"] + sc["heldout"]):
+                if not _state["running"] or (_state["cap"] and _state["n"] >= _state["cap"]):
+                    break
+                _phase("sourcing")
+                try:
+                    if await _one(_state["n"] + 1, sc_i) is not False:
+                        _state["n"] += 1
+                        done_here += 1
+                        if done_here % LIBRARIAN_EVERY == 0:
+                            _phase("tidying memory")
+                            librarian.run(emit)  # distil lessons and tidy memory every few deals
+                except Exception as e:  # one bad deal must not stop the shift
+                    emit("system", "error", f"Deal skipped: {type(e).__name__}", {})
+                save()
+                await asyncio.sleep(0.5)
+                if done_here and done_here % 10 == 0:
+                    break  # long shift: rescan the market every ten deals
+            await asyncio.sleep(1)  # never spin if a whole batch was over the spend limit
     finally:
         _state["running"] = False
         _state["ended"] = time.time()
@@ -248,7 +329,12 @@ def briefing() -> dict:
     sold = [d for d in ds if d["state"] == "sold"]
     profit = sum(d["sold_for"] - d["bought_for"] for d in sold)
     waiting = [d["id"] for d in ds if d["state"] == "awaiting_approval"]
-    text = (f"{len(ds)} deals worked, {len(sold)} sold for ${profit:,} profit, "
-            f"{len(waiting)} waiting for your OK.")
+    shipping = [d["id"] for d in ds if d["state"] in ("bought", "in_transit", "delivered")]
+    listed = [d["id"] for d in ds if d["state"] == "listed"]
+    scams = sum(1 for e in EVENTS if e["type"] == "blocked")
+    text = (f"{len(ds)} deals worked, {len(sold)} sold for ${profit:,} profit, {len(shipping)} on the way, "
+            f"{len(listed)} on the storefront, {scams} scam{'s' * (scams != 1)} blocked, {len(waiting)} waiting for your OK"
+            + (f": {', '.join(waiting)}." if waiting else "."))
     return {"text": text, "deals": len(ds), "sold": len(sold), "profit": profit, "awaiting": waiting,
+            "shipping": shipping, "listed": listed, "scams_blocked": scams,
             "brain": brain.stats()}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { api } from "./api";
 import ActivityFeed from "./ActivityFeed";
 import { agentName, money, profit, time } from "./format";
 import type { AgentEvent, Brain, Deal, DealState, EvalResult, Health } from "./types";
@@ -118,7 +119,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
         <div className="mission-side">
           <dl className="clock-grid">
             <div><dt>Elapsed</dt><dd className="mono">{clock(elapsed)}</dd></div>
-            <div><dt>Deals</dt><dd className="mono">{shift?.n ?? 0}<span className="muted">/{shift?.cap || size}</span></dd></div>
+            <div><dt>Deals</dt><dd className="mono">{shift?.n ?? 0}<span className="muted">/{shift?.continuous || (!running && !size) ? "∞" : shift?.cap || size}</span></dd></div>
           </dl>
           <div className="progress big" role="img" aria-label="Shift progress">
             <div style={{ width: `${shift?.cap ? Math.min(100, (shift.n / shift.cap) * 100) : 0}%` }} className={running ? "live" : ""} />
@@ -129,7 +130,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
             <div className="row">
               <label className="sr-only" htmlFor="shift-size">Deals this shift</label>
               <select id="shift-size" value={size} onChange={(e) => setSize(Number(e.target.value))} disabled={!health}>
-                {[3, 5, 10, 20].map((n) => <option key={n} value={n}>{n} deals</option>)}
+                {[3, 5, 10, 20, 0].map((n) => <option key={n} value={n}>{n ? `${n} deals` : "Until I stop it"}</option>)}
               </select>
               <button className="primary" onClick={() => onStart(size)} disabled={!health}>Start shift</button>
             </div>
@@ -141,7 +142,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
       <section className="panel" aria-labelledby="pipeline">
         <div className="panel-head">
           <h2 id="pipeline">Progress</h2>
-          <span className="muted small">{deals.length} deals · {deals.filter((d) => d.state === "dropped").length} stopped</span>
+          <span className="muted small">{deals.length} deals · {deals.filter((d) => d.state === "dropped").length} stopped · <a href={api.storefrontUrl} target="_blank" rel="noreferrer">Storefront</a></span>
         </div>
         <ol className="stepper">
           {STEPS.map((s, i) => {

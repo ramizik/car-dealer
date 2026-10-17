@@ -48,6 +48,7 @@ const AGENT_NAMES: Record<string, string> = {
   seller_agent: "Sales desk",
   logistics: "Shipping",
   librarian: "Memory",
+  merchandiser: "Listings",
 };
 export const agentName = (a: string) => AGENT_NAMES[a] ?? a;
 

@@ -3,10 +3,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Request  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+import html  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -18,10 +19,16 @@ import dealer_profile  # noqa: E402
 import loop  # noqa: E402
 import swarm  # noqa: E402
 import memory  # noqa: E402
+import librarian  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
 
 app = FastAPI(title="dealer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.on_event("startup")
+async def _resume():
+    swarm.resume()  # shipments and listings in flight before a restart carry on
 
 
 @app.exception_handler(Exception)
@@ -55,12 +62,13 @@ def get_eval():
 
 
 class ShiftReq(BaseModel):
-    max_deals: int = 5
+    max_deals: int = 5  # 0 = continuous: the team keeps working until /shift/stop
 
 
 @app.post("/shift/start")
 async def shift_start(req: ShiftReq = ShiftReq()):
-    return {"started": swarm.start(max(1, min(req.max_deals, 20)))}
+    n = 0 if req.max_deals <= 0 else min(req.max_deals, 20)
+    return {"started": swarm.start(n), "continuous": n == 0}
 
 
 @app.post("/shift/stop")
@@ -143,6 +151,34 @@ def onboarding_questions():
 def get_brain():
     v = brain.view()
     return {**v, "stats": brain.stats(), "playbook": brain.playbook()}
+
+
+@app.post("/brain/compact")
+def compact_brain():
+    return librarian.run(swarm.emit)
+
+
+@app.get("/storefront", response_class=HTMLResponse)
+def storefront():
+    """Joe's public inventory page, written by the merchandiser agent."""
+    cards = []
+    for d in swarm.public_deals():
+        if d["state"] not in ("listed", "sold"):
+            continue
+        l = d.get("listing") or {"title": d["car"], "description": "", "bullets": []}
+        price = f"SOLD" if d["state"] == "sold" else f"${int(d.get('list_price') or 0):,}"
+        bullets = "".join(f"<li>{html.escape(b)}</li>" for b in l.get("bullets", []))
+        cards.append(f"<article class='{d['state']}'><h2>{html.escape(l['title'])}</h2><p class='price'>{price}</p>"
+                     f"<p>{html.escape(l.get('description', ''))}</p><ul>{bullets}</ul><small>{d['id']}</small></article>")
+    body = "".join(cards) or "<p>No cars listed yet. The team lists cars as they arrive on the lot.</p>"
+    return f"""<!doctype html><html><head><meta charset='utf-8'><meta http-equiv='refresh' content='5'>
+<title>Joe's Auto - Stockton CA</title><style>
+body{{font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}}
+h1{{margin-bottom:.2rem}} .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}}
+article{{border:1px solid #ddd;border-radius:10px;padding:1rem}} article.sold{{opacity:.5}}
+.price{{font-size:1.4rem;font-weight:700;margin:.2rem 0}} small{{color:#888}}
+</style></head><body><h1>Joe's Auto</h1><p>Used trucks and SUVs, Stockton CA. Listings written by our AI team.</p>
+<div class='grid'>{body}</div></body></html>"""
 
 
 @app.post("/brain/load/{name}")

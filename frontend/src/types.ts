@@ -60,6 +60,8 @@ export type ShiftStatus = {
   ended: number | null;
   phase: string;
   deal: string | null;
+  continuous?: boolean;
+  background?: number;
 };
 
 export type LlmTier = { model: string; calls?: number; errors?: number; avg_latency: number | null };

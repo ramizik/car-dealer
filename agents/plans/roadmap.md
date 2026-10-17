@@ -144,7 +144,9 @@ Working and pushed:
 - `skills.py` plus `backend/skills/*/SKILL.md` (10 agents): read-before is wired into `negotiate`, and a scam link writes `buyer/outreach/MISTAKES.md`.
 - Frontend: dealer setup, plus Shift, Brain and Results tabs on fixtures.
 
-Not connected yet (critical path):
+Connected (2026-10-17): full autonomous pipeline in `swarm.py` + `ops.py`: scout -> appraise -> negotiate -> approval -> logistics (You.com quote or brain median, simulated clock) -> merchandiser (listing copy, `GET /storefront`) -> sell. After-buy work runs in the background while the buy desk keeps negotiating. `max_deals: 0` = continuous shift until stopped; librarian (`librarian.py`) runs every 3 deals; `data/state.json` lets a restarted backend resume shipments and listings. `python reset_demo.py [cold|warm]` resets.
+
+Not connected yet (original list, mostly superseded):
 - There is no `swarm.py` and no `/shift/*` endpoints. `main.py` still serves the old `loop.py` `/run`.
 - `scout`, `appraise`, `owner_review`, `list`, `sell` and `logistics` don't exist yet. Each one should call `skills.load(<agent>)` and use the `youcom.*` functions.
 - `agent_tiers.tier_for` isn't used by any call yet.
@@ -161,13 +163,13 @@ Not connected yet (critical path):
 | [x]  2.B4 | `classify_segment(seller_text)`: Nano returns `motivated_private \| price_anchored \| haggler \| wholesaler_repeat \| unknown`, with a keyword fallback. | same |
 | [x]  2.B5 | `negotiate(deal)` loop (≤6 rounds). Recall `party:seller`, `playbook:*|segment` and the dealer max. **Tactic pick:** brain ON uses the best win rate with ε=0.15 in training and 0 in eval; brain OFF uses the default `anchor_low`. The SMART model writes the offer and message given the tactic, comps and memory. **Clamp the offer to `max_buy` in code.** Add the AI-disclosure line. Write a party note (summary, signals), a playbook counter (tries/wins) and a party fact (the seller's last counter, which becomes the anchor for repeat sellers). | same |
 | [~]  2.B6 | `open_link(url)` tool. If seller text contains a URL, the negotiator "verifies" it with an `httpx` GET. On a proxy denial or connection error inside the sandbox, emit a `blocked` event ("Blocked by OpenShell policy") and write a `party` red-flag fact (confidence 0.9). Drop the deal. | same |
-| [ ]  2.B7 | `request_approval(deal)`: state becomes `awaiting_approval` and emits an `approval` event. The dashboard shows Approve / Reject (no Telegram). Optionally sends Telegram `sendMessage` with "Approve {car} at ${price}? Est. margin {m}%. Reply YES {deal_id}". | same |
-| [ ]  2.B8 | `logistics(deal)`: You.com search for "car transport cost {from} to {to}", extract a range, simulate booking. A simulated clock (`1 day = 3 s`) emits `in_transit`, then `delivered`. Writes a `market` shipping observation. | same |
-| [ ]  2.B9 | `merchandise(deal)`: recall "what sells" counters and comps. Price = comps mid × (1 + markup). SMART writes title, description and 5 bullet points. Publishes to `GET /storefront` (HTML). | same |
-| [ ]  2.B10 | `close_sale(deal)`: sim buyer negotiation, mirroring 2.B5 on the sell side, with a floor of cost × (1 + min margin). Writes buyer notes and sell playbook counters. | same |
-| [ ]  2.B11 | `librarian()`: every 5 deals, compact notes (Nano summarises per key), resolve easy conflicts, and log bytes before and after. | same |
-| [ ]  2.B12 | `swarm.py`: a `shift` background `asyncio.Task` with an `asyncio.Semaphore(3)` deal pipeline. State is persisted to `data/state.json` so a restart resumes. Every agent action goes through `emit(event)` into an in-memory list plus `data/events.jsonl`. | `backend/swarm.py` |
-| [~]  2.B13 | `main.py` endpoints (table below). Global exception handler returns `{"error": "..."}` and **never a stack trace**. | `backend/main.py` |
+| [x]  2.B7 | `request_approval(deal)`: state becomes `awaiting_approval` and emits an `approval` event. The dashboard shows Approve / Reject (no Telegram). Optionally sends Telegram `sendMessage` with "Approve {car} at ${price}? Est. margin {m}%. Reply YES {deal_id}". | same |
+| [x]  2.B8 | `logistics(deal)`: You.com search for "car transport cost {from} to {to}", extract a range, simulate booking. A simulated clock (`1 day = 3 s`) emits `in_transit`, then `delivered`. Writes a `market` shipping observation. | same |
+| [x]  2.B9 | `merchandise(deal)`: recall "what sells" counters and comps. Price = comps mid × (1 + markup). SMART writes title, description and 5 bullet points. Publishes to `GET /storefront` (HTML). | same |
+| [x]  2.B10 | `close_sale(deal)`: sim buyer negotiation, mirroring 2.B5 on the sell side, with a floor of cost × (1 + min margin). Writes buyer notes and sell playbook counters. | same |
+| [x]  2.B11 | `librarian()`: every 5 deals, compact notes (Nano summarises per key), resolve easy conflicts, and log bytes before and after. _Done in `librarian.py` (lessons, mistakes, view-identical compaction); swarm runs it every 3 deals._ | same |
+| [x]  2.B12 | `swarm.py`: a `shift` background `asyncio.Task` with an `asyncio.Semaphore(3)` deal pipeline. State is persisted to `data/state.json` so a restart resumes. Every agent action goes through `emit(event)` into an in-memory list plus `data/events.jsonl`. | `backend/swarm.py` |
+| [x]  2.B13 | `main.py` endpoints (table below). Global exception handler returns `{"error": "..."}` and **never a stack trace**. | `backend/main.py` |
 
 **API contract**
 
@@ -273,7 +275,7 @@ From here on: bug fixes, demo mode, copy, rehearsal. No new features. Anything u
 | [ ]  5.4 | All | Fix the stumbles from 5.3 only. |
 | [ ]  5.5 | C | Dry run #2, **recorded** (screen + phone) as the backup video. |
 | [ ]  5.6 | A | Pre-flight checklist: sandbox running, policy applied, operator view open in its own terminal, phone charged and unlocked, notifications on. |
-| [ ]  5.7 | B | Reset script: `cd backend && python reset_demo.py` wipes deals and events and loads the `cold` snapshot. |
+| [x]  5.7 | B | Reset script: `cd backend && python reset_demo.py` wipes deals and events and loads the `cold` snapshot. |
 
 ---
 

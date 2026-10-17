@@ -25,6 +25,10 @@ curl -s -X POST http://10.120.0.2:8000/shift/start \
   -H 'Content-Type: application/json' -d '{"query": "Toyota Tacoma near Stockton", "max_deals": 5}'
 ```
 
+Run all night ("keep working", "run until I stop you"): `"max_deals": 0` keeps scouting, buying, shipping, listing and selling until stopped.
+
+Public listings page the team publishes: `curl -s http://10.120.0.2:8000/storefront`
+
 Stop the shift:
 
 ```bash
