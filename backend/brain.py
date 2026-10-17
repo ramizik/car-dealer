@@ -26,6 +26,7 @@ NOTE_CAP_DEFAULT = 50
 CONFLICT_CONF = 0.7
 
 ENABLED = True
+RECALL_STATS = {"calls": 0, "chars": 0}  # memory text handed to agents, for the admin page
 listeners = []  # callables(agent, kind, payload) -> swarm turns these into feed events
 
 _lock = threading.Lock()
@@ -203,6 +204,8 @@ def recall(scopes, keys=(), tags=None, budget_chars=1500, agent="") -> list[str]
             break
         out.append(line)
         used += len(line) + 1
+    RECALL_STATS["calls"] += 1
+    RECALL_STATS["chars"] += used
     _emit(agent, "recall", out)
     return out
 

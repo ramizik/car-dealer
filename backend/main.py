@@ -277,7 +277,10 @@ def admin_memory(token: str = ""):
     except Exception:
         ev = None
     return {
-        "brain": brain.stats(),
+        "brain": {**brain.stats(), "bytes_kb": round(brain.stats()["bytes"] / 1024, 1),
+                  "recall_calls": brain.RECALL_STATS["calls"],
+                  "recall_avg_chars": round(brain.RECALL_STATS["chars"] / brain.RECALL_STATS["calls"]) if brain.RECALL_STATS["calls"] else 0,
+                  "recall_avg_tokens_est": round(brain.RECALL_STATS["chars"] / brain.RECALL_STATS["calls"] / 4) if brain.RECALL_STATS["calls"] else 0},
         "eval": ev and {"seed": ev.get("seed"), "train_n": ev.get("train_n"), "heldout_n": ev.get("heldout_n"),
                         "off": ev.get("off"), "on": ev.get("on"), "secs": ev.get("secs")},
         "llm": llm.STATS,

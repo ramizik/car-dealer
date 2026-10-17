@@ -5,7 +5,8 @@ const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 type Arm = { n: number; close_rate: number; mean_saved_pct: number; surplus_captured_pct: number; mean_rounds: number; scams_blocked: number; scams: number };
 type Data = {
-  brain: { events: number; keys: Record<string, number>; conflicts: number; per_scope: Record<string, number> };
+  brain: { events: number; bytes_kb: number; keys: Record<string, number>; conflicts: number; per_scope: Record<string, number>;
+           recall_calls: number; recall_avg_chars: number; recall_avg_tokens_est: number };
   eval: { seed: number; train_n: number; heldout_n: number; off: Arm; on: Arm; secs: number } | null;
   llm: Record<string, { calls: number; errors: number }>;
   youcom: { calls: number; cache_hits: number; errors: number; demo_mode: boolean };
@@ -119,12 +120,16 @@ export default function AdminMemory() {
       </section>
 
       <section className="stack-sm" aria-labelledby="mem-head">
-        <h2 id="mem-head">Memory in use</h2>
+        <h2 id="mem-head">Memory size</h2>
         <div className="summary">
-          <div className="stat"><span className="value">{data.brain.events}</span><span className="label">Shared memory entries</span></div>
-          <div className="stat"><span className="value">{data.brain.conflicts}</span><span className="label">Conflicting facts</span></div>
-          <div className="stat"><span className="value">{Object.values(data.brain.keys).reduce((a, b) => a + b, 0)}</span><span className="label">Remembered keys</span></div>
+          <div className="stat"><span className="value">{data.brain.bytes_kb} KB</span><span className="label">Stored on disk (shared memory log)</span></div>
+          <div className="stat"><span className="value">{data.brain.recall_avg_chars.toLocaleString()} chars</span><span className="label">Memory added per agent call (average)</span></div>
+          <div className="stat"><span className="value">~{data.brain.recall_avg_tokens_est.toLocaleString()} tokens</span><span className="label">Estimated tokens per call (chars ÷ 4)</span></div>
         </div>
+        <p className="small muted">
+          {data.brain.events.toLocaleString()} memory entries across {data.brain.recall_calls.toLocaleString()} lookups this server run.
+          The token figure is an estimate: the app doesn't count real model tokens yet.
+        </p>
       </section>
 
       <section className="stack-sm" aria-labelledby="calls-head">
