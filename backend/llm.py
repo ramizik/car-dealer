@@ -17,9 +17,9 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpe
 
 BASE_URL = os.getenv("CRUSOE_BASE_URL", "https://api.inference.crusoecloud.com/v1")
 TIERS = {
-    "smart": os.getenv("CRUSOE_MODEL_SMART", "nvidia/Nemotron-3-Super-120B-A12B"),
-    "fast": os.getenv("CRUSOE_MODEL_FAST", "nvidia/Nemotron-3-Nano-30B-A3B"),
-    "sim": os.getenv("CRUSOE_MODEL_SIM", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+    "smart": os.getenv("CRUSOE_MODEL_SMART", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B"),
+    "fast": os.getenv("CRUSOE_MODEL_FAST", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"),
+    "sim": os.getenv("CRUSOE_MODEL_SIM", "nvidia/Nemotron-3.5-Lightning-30B-A3B"),
     "vision": os.getenv("CRUSOE_MODEL_VISION", "nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B"),
 }
 RPM = int(os.getenv("CRUSOE_RPM", "30"))  # per model: 30 without a payment method, 600 with one

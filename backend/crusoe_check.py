@@ -38,7 +38,7 @@ async def main() -> int:
         try:
             out = await llm.chat("Reply with one word.", "Say OK.", tier=tier, max_tokens=256)
             ok = bool(out.strip())
-            print(f"[{tier}] {model} {time.monotonic() - t0:.1f}s {'OK' if ok else 'EMPTY'} features={m.get('features')}")
+            print(f"[{tier}] {model} {time.monotonic() - t0:.1f}s {'OK' if ok else 'EMPTY'} tags={m.get('tags')}")
             failed += not ok
         except Exception as e:
             print(f"[{tier}] {model} ERROR {type(e).__name__}: {str(e)[:160]}")
