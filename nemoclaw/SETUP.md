@@ -13,7 +13,20 @@ nemoclaw/
   presets/dealer-api-host.yaml egress: dealer backend on the host (Plan B)
 ```
 
-## 0. Windows host prep (once, needs Administrator and maybe a reboot)
+## 0. Team host: DigitalOcean droplet (default)
+
+We run NemoClaw on a shared Ubuntu 24.04 droplet, not on laptops. Its address is in `backend/.env` (`DROPLET_IP`, `DROPLET_USER`).
+
+```bash
+ssh $DROPLET_USER@$DROPLET_IP
+# once, before installing: 8 GB swap so the 2.4 GB image push does not hit OOM on 8 GB RAM
+fallocate -l 8G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
+Then go to step 1.A1. To add a teammate, append their public key to `~/.ssh/authorized_keys` on the droplet.
+
+## 0b. Windows host prep (only if running locally) (once, needs Administrator and maybe a reboot)
 
 NemoClaw on Windows runs inside WSL2 Ubuntu with Docker Desktop (WSL backend). In Windows PowerShell:
 

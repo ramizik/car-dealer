@@ -22,6 +22,12 @@ Act as a blunt hackathon CTO. Optimize for speed, demo stability, simplicity, ju
 - Frontend: Vite + React + TypeScript in `frontend/`. useState only.
 - LLM: `backend/llm.py` wraps Crusoe via the `openai` SDK. Pick a tier, never a model ID: `llm.chat(..., tier="smart"|"fast"|"sim"|"vision")` (Super for leads/talk/appraisal, Nano for extraction, Lightning for sims/librarian, Nano Omni for photos). Model IDs live in `.env` (`CRUSOE_MODEL_*`). Built-in per-model RPM throttle + 429/503 backoff. Mock mode when `CRUSOE_API_KEY` is empty. Check setup: `cd backend && python crusoe_check.py`.
 
+## NemoClaw droplet (shared)
+- DigitalOcean Ubuntu 24.04 droplet (4 vCPU / 8 GB + swap) runs the NemoClaw `dealer` sandbox and the backend (Plan A). Runbook: `nemoclaw/SETUP.md`.
+- Address in `backend/.env`: `DROPLET_IP`, `DROPLET_PRIVATE_IP`, `DROPLET_USER` (values shared by the team, never committed). Connect: `ssh $DROPLET_USER@$DROPLET_IP`.
+- Access is by SSH key only. New teammate: send your public key (`~/.ssh/id_ed25519.pub`) to the droplet owner to append to `~/.ssh/authorized_keys`.
+- Never put keys on the droplet in files under the repo; export them in the shell.
+
 ## Layout
 - `backend/loop.py` - define-done -> work -> verify -> decide loop
 - `backend/memory.py` - shared brain (JSON file, capped lessons)
