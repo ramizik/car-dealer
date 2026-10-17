@@ -9,6 +9,7 @@ SIM_FAST=1 -> templated text (eval). Otherwise the `sim` tier rewrites the templ
 import json
 import os
 import random
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -64,7 +65,8 @@ async def _rewrite(template: str, role: str) -> str:
             "Keep every number and URL exactly as written. Do not add new prices.",
             template, temperature=0.7, tier="sim", max_tokens=200)
         nums = [t for t in template.replace(",", "").split() if t.strip("$.,!?").isdigit()]
-        if out and all(n.strip("$.,!?") in out.replace(",", "") for n in nums):
+        urls = re.findall(r"https?://\S+", template)
+        if out and all(n.strip("$.,!?") in out.replace(",", "") for n in nums) and all(u in out for u in urls):
             return out.strip()
     except Exception:
         pass

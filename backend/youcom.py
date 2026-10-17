@@ -24,17 +24,18 @@ SEED_LISTINGS = DATA / "seed_listings.json"
 listeners = []  # callables(kind, payload): "call" | "cache_hit" | "error"
 STATS = {"calls": 0, "cache_hits": 0, "errors": 0, "latency_total": 0.0}
 
-# Query templates that point Search at individual listing pages (1.D3).
+# Query templates (1.D3), tested live 2026-10-17 for Toyota Tacoma/4Runner/RAV4/Tundra near Stockton.
+# Listing pages per 10 results: craigslist cto 2-6, certified-inventory 0-1. Aggregators (cars.com,
+# cargurus, autotrader, truecar) only return search pages -> use extract_listings() on their markdown.
 QUERY_TEMPLATES = [
+    "site:{cl_site}.craigslist.org {make} {model} {city_short} cto",
+    "certified used {make} {model} {city_short} inventory stock VIN price mileage",
     "{year_from}-{year_to} {make} {model} for sale near {city} under ${max_price}",
-    "{year_from}-{year_to} {make} {model} for sale {city} site:cars.com",
-    "used {make} {model} {year_from}-{year_to} for sale {city} site:cargurus.com",
-    "{make} {model} {year_from}-{year_to} for sale by owner {city} craigslist",
-    "{year_from} {make} {model} for sale near {city} site:autotrader.com",
 ]
-LISTING_DOMAINS = ("cars.com", "autotrader.com", "cargurus.com", "craigslist.org", "bringatrailer.com",
-                   "carsandbids.com", "copart.com", "iaai.com", "carmax.com", "truecar.com", "edmunds.com")
-LISTING_PATH = re.compile(r"/vehicledetail/|/cars-for-sale/vehicle/|listing|/vehicle/|/cto/d/|/ctd/d/|/auctions/|/lot/|/\d{6,}")
+LISTING_URL = re.compile(
+    r"craigslist\.org/.+/ct[od]/d/|/vehicledetail/|/cars-for-sale/vehicle/|bringatrailer\.com/listing/"
+    r"|carsandbids\.com/auctions/|/inventory/.*[a-hj-npr-z0-9]{17}|/auto/used-.+/\d+")
+AGGREGATORS = ("cars.com/shopping/", "cargurus.com/cars/", "autotrader.com/cars-for-sale/", "truecar.com/used-cars-for-sale/")
 
 
 def _key() -> str:
@@ -127,26 +128,35 @@ async def research(question: str, effort: str = "lite") -> dict:
 
 
 def is_listing_url(url: str) -> bool:
-    u = (url or "").lower()
-    return any(d in u for d in LISTING_DOMAINS) and bool(LISTING_PATH.search(u))
+    return bool(LISTING_URL.search((url or "").lower()))
+
+
+def is_aggregator_url(url: str) -> bool:
+    return any(a in (url or "").lower() for a in AGGREGATORS)
 
 
 def scout_queries(profile: dict) -> list[str]:
-    p = {"year_from": 2015, "year_to": 2022, "city": "Stockton CA", "max_price": 30000, **profile}
+    p = {"year_from": 2015, "year_to": 2022, "city": "Stockton CA", "max_price": 30000, "cl_site": "sfbay", **profile}
+    p.setdefault("city_short", p["city"].split(",")[0].split(" CA")[0])
     return [t.format(**p) for t in QUERY_TEMPLATES]
 
 
 async def find_listing_urls(profile: dict, limit: int = 8) -> list[dict]:
-    """Run scout queries, keep individual listing pages. [{url, title, description}]."""
+    """Run scout queries, keep individual listing pages. [{url, title, description}].
+    Aggregator search pages are kept at the end with kind="aggregator" for extract_listings()."""
     seen, out = set(), []
     results = await asyncio.gather(*(search(q, count=10) for q in scout_queries(profile)))
     for rs in results:
         for r in rs:
             url = r.get("url", "")
-            if url in seen or not is_listing_url(url):
+            if url in seen or not (is_listing_url(url) or is_aggregator_url(url)):
                 continue
             seen.add(url)
-            out.append({"url": url, "title": r.get("title", ""), "description": r.get("description", "")})
+            kind = "listing" if is_listing_url(url) else "aggregator"
+            text = "\n".join([r.get("title", ""), r.get("description", "")] + list(r.get("snippets") or []))
+            out.append({"url": url, "title": r.get("title", ""), "description": r.get("description", ""),
+                        "kind": kind, "text": text})
+    out.sort(key=lambda x: x["kind"] != "listing")
     return out[:limit]
 
 
@@ -180,6 +190,61 @@ async def extract_listing(markdown: str, url: str = "") -> dict | None:
     return d
 
 
+EXTRACT_MANY_SYSTEM = (
+    "The page is a used-car search results page. Extract up to 10 individual listings as a JSON list. "
+    "Each item: year (int), make, model, trim, miles (int), price (int USD), city, url (absolute if shown). "
+    "Skip items without both price and miles. Never invent numbers."
+)
+
+
+async def extract_listings(markdown: str, url: str = "") -> list[dict]:
+    """Many listings from one aggregator page (cars.com/cargurus search results)."""
+    import llm
+    if not markdown:
+        return []
+    d = await llm.chat_json(EXTRACT_MANY_SYSTEM, f"Page: {url}\n\n{markdown[:12000]}", tier="fast")
+    items = d if isinstance(d, list) else (d.get("listings") or []) if isinstance(d, dict) else []
+    out = []
+    for x in items:
+        if not isinstance(x, dict):
+            continue
+        x["price"], x["miles"], x["year"] = _int(x.get("price")), _int(x.get("miles")), _int(x.get("year"))
+        if x["price"] and x["miles"]:
+            x["url"] = x.get("url") or url
+            x.setdefault("photo_urls", [])
+            out.append(x)
+    return out
+
+
+async def fetch_listings(items: list[dict]) -> list[dict]:
+    """find_listing_urls() output -> parsed listings. Contents API first; craigslist blocks it,
+    so fall back to the search snippets (they carry year/miles/VIN). Aggregators -> many listings.
+    Parsed result is cached too, so demo mode is instant and stable."""
+    memo = _cache_path("parsed", {"urls": [i["url"] for i in items]})
+    if memo.exists():
+        try:
+            return json.loads(memo.read_text(encoding="utf-8"))["response"]
+        except Exception:
+            pass
+    pages = {p.get("url"): p.get("markdown") or "" for p in await contents([i["url"] for i in items])}
+    out = []
+    for i in items:
+        md = pages.get(i["url"]) or ""
+        if i.get("kind") == "aggregator":
+            out += await extract_listings(md, i["url"]) if md else []
+        else:
+            d = await extract_listing(md or i.get("text", ""), i["url"])
+            if d:
+                out.append(d)
+    if out:
+        try:
+            CACHE.mkdir(parents=True, exist_ok=True)
+            memo.write_text(json.dumps({"endpoint": "parsed", "response": out}), encoding="utf-8")
+        except Exception:
+            pass
+    return out
+
+
 def seed_listings() -> list[dict]:
     """Guaranteed fallback listings (1.D5)."""
     try:
@@ -192,3 +257,21 @@ def stats() -> dict:
     n = STATS["calls"]
     return {**STATS, "avg_latency": round(STATS["latency_total"] / n, 2) if n else None,
             "demo_mode": _demo(), "has_key": bool(_key())}
+
+
+DEMO_PROFILES = [{"make": "Toyota", "model": m, "city": "Stockton CA"} for m in ("Tacoma", "4Runner", "RAV4", "Tundra")]
+
+
+async def prewarm(profiles: list[dict] = DEMO_PROFILES) -> dict:
+    """Fill data/cache for the demo queries so DEMO_MODE=1 runs offline (3.D1)."""
+    counts = {}
+    for p in profiles:
+        items = await find_listing_urls(p)
+        counts[p["model"]] = len(await fetch_listings(items))
+    return counts
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    print(asyncio.run(prewarm()), stats())
