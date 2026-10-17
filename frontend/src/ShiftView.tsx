@@ -131,7 +131,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
         <div className="mission-side">
           <dl className="clock-grid">
             <div><dt>Elapsed</dt><dd className="mono">{clock(elapsed)}</dd></div>
-            <div><dt>Deals</dt><dd className="mono">{shift?.n ?? 0}<span className="muted">/{shift?.continuous || (!running && !size) ? "∞" : shift?.cap || size}</span></dd></div>
+            <div><dt>Deals</dt><dd className="mono">{shift?.n ?? 0}{running || started ? <span className="muted">/{shift?.continuous ? "∞" : shift?.cap || size}</span> : null}</dd></div>
           </dl>
           <div className="progress big" role="img" aria-label="Shift progress">
             <div style={{ width: `${shift?.cap ? Math.min(100, (shift.n / shift.cap) * 100) : 0}%` }} className={running ? "live" : ""} />

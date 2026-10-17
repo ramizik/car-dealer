@@ -362,22 +362,22 @@ select { font: inherit; min-height: 40px; padding: 6px 12px; border: 1px solid v
 
 .mission {
   display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 28px; align-items: center;
-  padding: 26px 28px; background: #18181b; color: #f4f4f5; border-radius: var(--radius);
+  padding: 26px 28px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
 }
 .mission h1 { font-size: 30px; margin-top: 10px; letter-spacing: -0.02em; }
-.mission-sub { color: #b4b4bb; margin-top: 6px; max-width: 60ch; font-size: 14px; }
-.run-state { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a1a1aa; }
-.run-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #71717a; }
-.run-state.on { color: #86efac; }
-.run-state.on::before { background: #22c55e; animation: pulse 1.6s ease-in-out infinite; }
+.mission-sub { color: var(--ink-2); margin-top: 6px; max-width: 60ch; font-size: 14px; }
+.run-state { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.run-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--off); }
+.run-state.on { color: var(--ok); }
+.run-state.on::before { background: var(--ok); animation: pulse 1.6s ease-in-out infinite; }
 .mission-side { display: flex; flex-direction: column; gap: 14px; }
-.mission button:not(.primary) { background: transparent; color: #f4f4f5; border-color: #52525b; }
-.mission select { background: #27272a; color: #f4f4f5; border-color: #52525b; }
+.mission button:not(.primary) { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.mission select { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
 .clock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
-.clock-grid dt { font-size: 12px; color: #a1a1aa; }
+.clock-grid dt { font-size: 12px; color: var(--ink-3); }
 .clock-grid dd { margin: 2px 0 0; font-size: 28px; font-weight: 600; }
-.clock-grid .muted { color: #71717a; }
-.progress.big { height: 6px; background: #3f3f46; }
+.clock-grid .muted { color: var(--ink-3); }
+.progress.big { height: 6px; background: var(--track); }
 .progress > div.live { background-image: linear-gradient(90deg, var(--brand), #e86a85, var(--brand)); background-size: 200% 100%; animation: flow 2s linear infinite; }
 
 .stepper { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 6px 0 16px; counter-reset: s; }
