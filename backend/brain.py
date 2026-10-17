@@ -199,6 +199,13 @@ def recall(scopes, keys=(), tags=None, budget_chars=1500, agent="") -> list[str]
     return out
 
 
+def get(scope: str, key: str) -> dict:
+    """Raw entry for numeric logic (repeat-seller anchor etc). Empty when brain is OFF."""
+    if not ENABLED:
+        return {}
+    return view()["scopes"].get(scope, {}).get(key, {})
+
+
 # ---------- ops ----------
 
 def stats() -> dict:
@@ -218,7 +225,7 @@ def playbook() -> list[dict]:
             if isinstance(c, dict) and "tries" in c:
                 tactic, _, segment = k.partition("|")
                 rows.append({"tactic": tactic, "segment": segment, "tries": c["tries"],
-                             "wins": c.get("wins", 0), "rate": c.get("wins", 0) / c["tries"] if c["tries"] else 0})
+                             "wins": c.get("wins", 0), "saved": c.get("saved", 0), "rate": c.get("wins", 0) / c["tries"] if c["tries"] else 0})
     return sorted(rows, key=lambda r: (r["segment"], -r["rate"]))
 
 
