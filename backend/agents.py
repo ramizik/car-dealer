@@ -161,8 +161,14 @@ def _ask_seller_agent(deal: dict, buy_price: float, emit, deal_id: str) -> dict:
     return q
 
 
-# Demo pacing: seconds between negotiation messages so each step can be read on stage. 0 for eval and tests.
-PACE_SECS = float(os.getenv("DEMO_PACE", "0"))
+# Demo pacing: a random pause between negotiation messages, so the run looks like people talking, not a script.
+# 0 and 0 for eval and tests.
+PACE_MIN = float(os.getenv("DEMO_PACE_MIN", "0"))
+PACE_MAX = float(os.getenv("DEMO_PACE_MAX", "0"))
+
+
+def pace() -> float:
+    return random.uniform(PACE_MIN, max(PACE_MIN, PACE_MAX))
 
 
 def bubble(t: dict) -> dict:
@@ -268,8 +274,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         transcript.append(entry)
         show(deal, entry)
         emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic, "channel": channel})
-        if PACE_SECS and not voice_on:
-            await asyncio.sleep(PACE_SECS)
+        if PACE_MAX and not voice_on:
+            await asyncio.sleep(pace())
 
         reply = seller.respond(int(offer), tactic)
         accepted, counter, seller_text = await reply if inspect.isawaitable(reply) else reply
@@ -278,8 +284,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         transcript.append({"from": "seller", "text": seller_text, "counter": counter})
         show(deal, transcript[-1])
         emit("seller", "message", seller_text, {"deal_id": deal_id, "counter": counter})
-        if PACE_SECS and not voice_on:
-            await asyncio.sleep(PACE_SECS)
+        if PACE_MAX and not voice_on:
+            await asyncio.sleep(pace())
 
         if re.search(r"https?://", seller_text or ""):
             dropped = "seller sent an off-platform payment link"
