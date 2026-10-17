@@ -29,7 +29,7 @@ Then: approver phone number (only if they chose "me by text") and one authority 
 
 ## Save
 
-Write one `dealer:{id}` profile to the brain with the choices, plus an `approval_policy` record that mirrors question 6 to 8. Re-ask only when a choice is missing or older than 90 days.
+Write one `dealer:{id}` profile to the brain with the choices, plus an `approval_policy` record that mirrors questions 9 to 11. Re-ask only when a choice is missing or older than 90 days.
 
 ## Rules
 
