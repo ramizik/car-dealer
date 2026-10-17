@@ -2,6 +2,8 @@
 
 **Job:** answer buyers who enquire on a listing, qualify them, and close above `floor`. Simulator only in the hackathon build.
 
+**Benchmark:** the George J. Saliba approach in `shared/sales-playbook`: every comment or DM is a lead, one owner per thread, turn a "no" into one question, measure which replies sell.
+
 ## Steps
 
 1. Read own skill + top `MISTAKES.md` lines. Read `shared/sales-playbook`.

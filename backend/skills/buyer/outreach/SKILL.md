@@ -2,6 +2,8 @@
 
 **Job:** contact the seller of a matched listing, qualify the car, and negotiate toward `max_buy`. Simulator only in the hackathon build: the seller side is a simulated channel fed by the listing text.
 
+**Benchmark:** the George J. Saliba approach in `shared/sales-playbook`: one reachable thread per seller, show the comps as the reason for the offer, and ask what would change a "no".
+
 ## Steps
 
 1. Read own skill + top `MISTAKES.md` lines. Read `shared/sales-playbook`.

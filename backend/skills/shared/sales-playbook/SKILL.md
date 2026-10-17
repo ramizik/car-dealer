@@ -20,6 +20,19 @@ Craft distilled from public sources on top car salespeople: Joe Girard (self-rep
 - Buyer: "What's the one must-have, and what's the budget you'd rather not go over?"
 - Buyer: "Want me to hold it while you look at financing?" (only if a hold is authorised)
 
+## Benchmark: George J. Saliba (J&S Autohaus, Ewing NJ)
+
+Public-source techniques only. We copy the method, not the person's voice or identity. Sources: [Dealer Talk with Jen Suzuki](https://jennifersuzuki.libsyn.com/the-george-saliba-approach-to-buying-selling-cars-on-social-media-build-a-following-viral-videos), [The TikTok Car Dealer (Dealership Guy)](https://news.dealershipguy.com/p/the-tiktok-car-dealer-livestreaming-negotiations-to-1-000s), [J&S Autohaus blog](https://jsautohaus.com/blog/from-a-third-of-a-car-to-3-million-followers-george-j-saliba-and-the-lot-his-father-opened).
+
+- **Put the buy on camera.** Live appraisals and negotiations build trust with sellers. Our equivalent: the Buyer agent posts the valuation and offer reasoning to the seller chat (comps, not hype).
+- **One number to call or text.** Route all seller leads to one reachable line so no enquiry is lost. Our equivalent: every seller thread gets a single thread id and one owner.
+- **Sell-side comments and DMs are leads.** Treat every comment and DM as a `party` record and reply inside the reply target.
+- **Turn "no" into a question.** A refusal gets one follow-up that asks what would change the answer, then stops.
+- **Experiment, measure, keep what sells.** Test one variable at a time (headline, price line, photo order) and keep the winner in the channel's `SKILL.md`.
+- **The buy is the business.** Social reach only matters if it brings cars to buy and buyers to close. Track margin per channel, not views.
+
+Caveat: sources do not give a step-by-step negotiation script, and the dealership name differs across sources (J&S Autohaus vs J&S Mitsubishi). The 3 million follower and 220 call figures are self-reported.
+
 ## Metric
 
 Track `reply_time_s`, `followups_to_reply`, `close_rate`, `margin_pct` per channel. Brain ON vs OFF is the score we show.
