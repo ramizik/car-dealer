@@ -76,7 +76,7 @@ export const deals: Deal[] = [
     state: "dropped",
     asking: 19900,
     max_buy: 29000,
-    drop_reason: "Seller sent an off-platform escrow link. Blocked by OpenShell policy.",
+    drop_reason: "Seller sent a suspicious payment link, so we stopped the deal.",
     chat: [
       {
         from: "seller",
@@ -136,7 +136,7 @@ export const events: AgentEvent[] = [
   ev(4, "D-104", "appraiser", "message", "Valued at $27,400 retail from 2 cited sources", "nemotron-super"),
   ev(5, "D-104", "negotiator", "recall", "Recalled best tactic for motivated sellers: fast cash pickup (7/9)"),
   ev(6, "D-104", "negotiator", "message", "Offered $22,800 citing 3 comps", "nemotron-super"),
-  ev(7, "D-105", "negotiator", "blocked", "Blocked by OpenShell policy: secure-escrow-verify.example.net"),
+  ev(7, "D-105", "negotiator", "blocked", "Stopped: seller sent a suspicious payment link"),
   ev(8, "D-105", "negotiator", "write", "Saved red flag: off-platform escrow link"),
   ev(9, "D-103", "negotiator", "message", "Offered $13,800 on Civic EX", "nemotron-super"),
   ev(10, "D-104", "negotiator", "message", "Seller accepted $23,900", "nemotron-super"),
@@ -164,7 +164,7 @@ export const brain: Brain = {
 };
 
 export const evalResult: EvalResult = {
-  headline: "With the brain, agents get 11.9% off asking instead of 6.1%",
+  headline: "With past deals, we get 11.9% off asking instead of 6.1%",
   scenarios: 10,
   metrics: [
     { name: "Avg discount off asking", unit: "%", off: 6.1, on: 11.9, higher_is_better: true },

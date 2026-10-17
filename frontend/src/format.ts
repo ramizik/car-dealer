@@ -38,3 +38,17 @@ export function keyNumber(d: Deal): string {
   if (d.offer !== undefined) return `Offer ${money(d.offer)} · asks ${money(d.asking)}`;
   return `Asks ${money(d.asking)}`;
 }
+
+// Plain names for agents in activity and history.
+const AGENT_NAMES: Record<string, string> = {
+  scout: "Scout",
+  appraiser: "Valuer",
+  negotiator: "Buyer",
+  seller: "Seller",
+  seller_agent: "Sales desk",
+  logistics: "Shipping",
+  librarian: "Memory",
+};
+export const agentName = (a: string) => AGENT_NAMES[a] ?? a;
+
+export const greeting = (d = new Date()) => (d.getHours() < 12 ? "Good morning" : d.getHours() < 18 ? "Good afternoon" : "Good evening");

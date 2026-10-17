@@ -9,20 +9,11 @@ type Props = {
   onDecide: (id: string, yes: boolean) => void;
 };
 
-const AGENT_NAMES: Record<string, string> = {
-  scout: "Scout",
-  appraiser: "Valuer",
-  negotiator: "Negotiator",
-  seller: "Seller",
-  seller_agent: "Sales desk",
-  logistics: "Shipping",
-  librarian: "Memory",
-};
 
 export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const step = STAGES.findIndex((s) => s.state === deal.state);
-  const history = events.filter((e) => e.deal_id === deal.id);
+  const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
   const stopped = deal.state === "dropped";
 
   // Escape closes, and focus starts on the close button so keyboard users are not lost behind the scrim.
@@ -92,12 +83,12 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
               {deal.chat.map((t, i) => (
                 <div key={i} className={`bubble ${t.from === "agent" ? "ours" : ""}`}>
                   <span className="who">
-                    {t.from === "agent" ? `Our agent${t.tactic ? ` · ${t.tactic.replace(/_/g, " ")}` : ""}` : "Seller"}
+                    {t.from === "agent" ? "You (via us)" : t.from === "buyer" ? "Buyer" : "Seller"}
                   </span>
                   <p>{t.text}</p>
                   {t.recalled && t.recalled.length > 0 && (
                     <div className="memory">
-                      Used from team memory
+                      Based on past deals
                       <div className="chips">
                         {t.recalled.map((r) => <span key={r} className="chip">{r}</span>)}
                       </div>
@@ -115,7 +106,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
           <ol className="history">
             {history.map((e) => (
               <li key={e.id} className={e.type === "blocked" ? "blocked" : ""}>
-                <span className="who">{time(e.ts)} · {AGENT_NAMES[e.agent] ?? e.agent}</span>
+                <span className="who">{time(e.ts)}</span>
                 {e.text}
               </li>
             ))}

@@ -13,9 +13,9 @@ export default function BrainView({ brain, onSnapshot }: Props) {
   const { stats } = brain;
   return (
     <>
-      <section className="summary" aria-label="Memory at a glance">
+      <section className="summary" aria-label="At a glance">
         <div className="stat"><span className="value">{stats.events}</span><span className="label">Things learned</span></div>
-        <div className="stat"><span className="value">{stats.kb} KB</span><span className="label">Memory size</span></div>
+        <div className="stat"><span className="value">{stats.kb} KB</span><span className="label">Stored</span></div>
         <div className={`stat ${brain.conflicts.length ? "attn" : ""}`}>
           <span className="value">{brain.conflicts.length}</span>
           <span className="label">Disagreements to review</span>
@@ -28,7 +28,7 @@ export default function BrainView({ brain, onSnapshot }: Props) {
         </p>
       )}
 
-      <section className="cards4" aria-label="What the team knows">
+      <section className="cards4" aria-label="What we know">
         {SCOPES.map((s) => (
           <div key={s.key} className="scope">
             <h3>{s.title}</h3>
@@ -74,7 +74,7 @@ export default function BrainView({ brain, onSnapshot }: Props) {
       {brain.conflicts.length > 0 && (
         <section aria-labelledby="disagree">
           <h2 id="disagree">Disagreements</h2>
-          <p className="muted small">Two agents saved different answers. We use the more confident one until you review it.</p>
+          <p className="muted small">We have two different answers for these. We use the more reliable one until you review it.</p>
           {brain.conflicts.map((c) => (
             <div key={c.key} className="conflict">
               <strong>{c.key}</strong>
@@ -87,9 +87,9 @@ export default function BrainView({ brain, onSnapshot }: Props) {
       )}
 
       <section className="row" aria-label="Demo controls">
-        <span className="muted small">Demo memory</span>
+        <span className="muted small">Demo</span>
         <button onClick={() => onSnapshot("cold")}>Start empty</button>
-        <button onClick={() => onSnapshot("warm")}>Load trained memory</button>
+        <button onClick={() => onSnapshot("warm")}>Load past deals</button>
       </section>
     </>
   );

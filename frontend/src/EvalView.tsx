@@ -7,14 +7,14 @@ export default function EvalView({ result, onRun }: Props) {
     <>
       <section>
         <p className="muted small">
-          The same {result.scenarios} sellers, run twice: once without team memory, once with it.
+          The same {result.scenarios} sellers, run twice: once without what we've learned, once with it.
         </p>
         <h2 className="headline">{result.headline}</h2>
       </section>
 
       <section className="legend" aria-label="Key">
-        <span><i className="swatch off" aria-hidden="true" />Without memory</span>
-        <span><i className="swatch on" aria-hidden="true" />With memory</span>
+        <span><i className="swatch off" aria-hidden="true" />Without past deals</span>
+        <span><i className="swatch on" aria-hidden="true" />With past deals</span>
       </section>
 
       <section className="metrics">
@@ -26,11 +26,11 @@ export default function EvalView({ result, onRun }: Props) {
               <div className="row">
                 <strong>{m.name}</strong>
                 <span className={better ? "good" : "muted small"}>
-                  {better ? "Better with memory" : m.higher_is_better ? "Higher is better" : "Lower is better"}
+                  {better ? "Better with past deals" : m.higher_is_better ? "Higher is better" : "Lower is better"}
                 </span>
               </div>
-              <Bar kind="off" value={m.off} max={max} unit={m.unit} label="Without memory" />
-              <Bar kind="on" value={m.on} max={max} unit={m.unit} label="With memory" />
+              <Bar kind="off" value={m.off} max={max} unit={m.unit} label="Without past deals" />
+              <Bar kind="on" value={m.on} max={max} unit={m.unit} label="With past deals" />
             </div>
           );
         })}
@@ -39,7 +39,7 @@ export default function EvalView({ result, onRun }: Props) {
       <section aria-labelledby="per-seller">
         <h2 id="per-seller">Seller by seller</h2>
         <table>
-          <thead><tr><th>Seller</th><th>Type</th><th>Without memory</th><th>With memory</th></tr></thead>
+          <thead><tr><th>Seller</th><th>Type</th><th>Without past deals</th><th>With past deals</th></tr></thead>
           <tbody>
             {result.rows.map((r) => (
               <tr key={r.scenario}>

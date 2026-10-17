@@ -29,7 +29,7 @@ export default function OnboardingView() {
     return (
       <section className="done" aria-live="polite">
         <h2>You're set up</h2>
-        <p>The team will use these choices from now on. You can change them any time.</p>
+        <p>We'll use these choices from now on. You can change them any time.</p>
         <button onClick={() => { setStep(0); setDone(false); }}>Review my answers</button>
       </section>
     );
