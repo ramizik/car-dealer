@@ -313,10 +313,16 @@ def sale_decision(deal_id: str, yes: bool) -> bool:
     return True
 
 
+def _sell_floor(deal: dict) -> int:
+    """Lowest price that keeps the dealer's minimum profit: what we paid + recon + their minimum (from setup)."""
+    return int(round(deal["bought_for"] + seller_agent.RECON + seller_agent.min_profit(), -1))
+
+
 async def _sell(deal: dict, buyer: sim.Buyer) -> bool:
     """List at the resale quote and talk to one buyer. An accepted price waits for the dealer.
     Returns True when the car sells. A walk-away leaves it listed for the next buyer."""
-    price = int(deal["list_price"])
+    floor = _sell_floor(deal)
+    price = max(int(deal["list_price"]), floor)
     party = f"buyer:{deal['id']}"
     emit("seller", "state", f"Listed {deal['car']} at ${price:,}", {"deal_id": deal["id"], "price": price})
     opening = buyer.opening()
@@ -351,7 +357,11 @@ async def _sell(deal: dict, buyer: sim.Buyer) -> bool:
             return True
         if counter is None:
             break  # buyer walked away; the car stays listed for the next buyer
-        price = max(counter, round(price - (price - counter) * 0.5, -1))
+        if price <= floor:  # already at the dealer's minimum profit: hold, don't chase the buyer lower
+            emit("seller", "state", f"Buyer below your minimum profit (floor ${floor:,}); keeping {deal['car']} listed",
+                 {"deal_id": deal["id"], "floor": floor})
+            break
+        price = int(max(counter, round(price - (price - counter) * 0.5, -1), floor))  # never below the floor
     deal["state"] = "listed"
     emit("seller", "state", f"{deal['car']} still listed at ${deal['list_price']:,}; no sale this round", {"deal_id": deal["id"]})
     return False
@@ -370,7 +380,7 @@ async def approve(deal_id: str, yes: bool, reason: str = "") -> bool:
     deal["bought_for"] = deal["offer"]
     deal["state"] = "bought"
     emit("buyer", "state", f"Bought {deal['car']} for ${deal['bought_for']:,}", {"deal_id": deal_id, "price": deal["bought_for"]})
-    deal["list_price"] = int(deal.pop("_resale", 0) or round(deal["bought_for"] * 1.15, -1))
+    deal["list_price"] = max(int(deal.pop("_resale", 0) or round(deal["bought_for"] * 1.15, -1)), _sell_floor(deal))
     _spawn(deal)
     return True
 
