@@ -266,12 +266,7 @@ SALE_ANSWER: dict[str, bool] = {}
 
 
 async def _ask_sale(deal: dict, price: int) -> bool:
-    """A buyer accepted. A clear win sells by itself; anything else waits for the dealer's yes. Returns the answer."""
-    gain = price - deal["bought_for"] - deal.get("shipping", 0) - seller_agent.RECON
-    if dealer_profile.get()["decision_mode"] != "dealer_decides" or gain >= AUTO_PROFIT_X * seller_agent.min_profit():
-        emit("seller", "state", f"Auto-sold {deal['car']} at ${price:,}: profit ${gain:,} clears your rule, no OK needed",
-             {"deal_id": deal["id"], "price": price, "auto": True})
-        return True
+    """A buyer accepted. Every sale waits for the dealer's yes, even a clear win. Returns the answer."""
     ev = asyncio.Event()
     SALE_EVENTS[deal["id"]] = ev
     SALE_ANSWER.pop(deal["id"], None)
