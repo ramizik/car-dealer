@@ -21,6 +21,7 @@ Act as a blunt hackathon CTO. Optimize for speed, demo stability, simplicity, ju
 - `backend/memory.py` - shared brain (JSON file, capped lessons)
 - `backend/main.py` - REST: `GET /health`, `POST /run`, `GET /memory`
 - `frontend/src/App.tsx` - goal input, trace view, memory view
+- `agents/` - shared team skills (`agents/skills/`) and plans (`agents/plans/`). Read `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md` before any Crusoe/LLM work.
 
 ## Commands
 - Backend: `cd backend && uvicorn main:app --reload --port 8000`
