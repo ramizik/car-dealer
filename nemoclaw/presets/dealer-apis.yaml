@@ -1,0 +1,33 @@
+# Custom egress preset for the `dealer` sandbox.
+# Allows only the APIs the dealer agents need. Everything else stays blocked and
+# shows up in `openshell term` for operator review (that is the scam-link demo).
+# Inference does not need an entry: the sandbox reaches Crusoe through inference.local.
+# Telegram egress comes from the maintained channel setup, not from this file.
+#
+# Apply:   nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-apis.yaml --dry-run
+#          nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-apis.yaml --yes
+# Check:   nemoclaw dealer policy list
+preset:
+  name: dealer-apis
+  description: "You.com Search/Contents/Research for the dealer agent team"
+network_policies:
+  dealer_youcom:
+    name: dealer_youcom
+    endpoints:
+      - host: ydc-index.io
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/search" }
+          - allow: { method: POST, path: "/v1/contents" }
+      - host: api.you.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/research" }
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/python3 }

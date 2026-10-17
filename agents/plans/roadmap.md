@@ -114,6 +114,8 @@ Step IDs keep their original lane letter (A/B/C/D) so history stays readable. A 
 
 ### Lane A: NemoClaw sandbox up
 
+_Repo side done: `nemoclaw/SETUP.md` (runbook, docs-checked commands), `nemoclaw/presets/dealer-apis.yaml` (You.com egress), `nemoclaw/presets/dealer-api-host.yaml` (Plan B host API), `nemoclaw/skills/dealer/SKILL.md` (concierge, name `dealer-concierge`). Host side blocked on: WSL2 Ubuntu install (admin and reboot), the Crusoe key in the onboarding shell, and a Telegram bot token from @BotFather. The concierge also needs the B endpoints `/shift/*`, `/deals/*`, `/briefing` and `PUT /dealer`._
+
 | Done | # | Step | File | Done when |
 |---|---|---|---|---|
 | [ ]  1.A1 | `nemoclaw onboard --name dealer` (agent: `openclaw`). Inference provider: **compatible OpenAI endpoint** with Crusoe base URL, key and the Nemotron SMART model ID. (For non-interactive runs, check `NEMOCLAW_PROVIDER` / `NEMOCLAW_MODEL` in the docs.) | `nemoclaw/SETUP.md` (commands only, no secrets) | `nemoclaw list` shows `dealer` with a Nemotron model |

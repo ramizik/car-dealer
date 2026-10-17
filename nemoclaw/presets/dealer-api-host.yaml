@@ -1,0 +1,24 @@
+# Lets the concierge call the dealer backend running on the host (Plan B).
+# host.openshell.internal is private, so it needs explicit trust:
+#   nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-api-host.yaml \
+#     --trusted-private-host host.openshell.internal --dry-run
+#   (same command with --yes to apply)
+preset:
+  name: dealer-api-host
+  description: "Dealer FastAPI backend on the host, port 8000"
+network_policies:
+  dealer_api_host:
+    name: dealer_api_host
+    endpoints:
+      - host: host.openshell.internal
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/shift/**" }
+          - allow: { method: POST, path: "/deals/**" }
+          - allow: { method: PUT, path: "/dealer" }
+    binaries:
+      - { path: /usr/bin/curl }
+      - { path: /usr/local/bin/node }
