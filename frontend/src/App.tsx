@@ -20,21 +20,6 @@ const NAV: { id: Section; label: string; icon: string; mobile: boolean }[] = [
   { id: "setup", label: "Setup", icon: "⚙", mobile: false },
 ];
 
-type Theme = "system" | "light" | "dark";
-const THEME_KEY = "dealer-theme";
-
-// Storage can throw in private windows, so every read falls back to "follow the system".
-function readTheme(): Theme {
-  try {
-    const t = localStorage.getItem(THEME_KEY);
-    return t === "light" || t === "dark" ? t : "system";
-  } catch {
-    return "system";
-  }
-}
-
-const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-
 export default function App() {
   const [section, setSection] = useState<Section>("home");
   // Everything on screen comes from the backend. Nothing is shown until it answers.
@@ -45,7 +30,6 @@ export default function App() {
   const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
   const [offline, setOffline] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>(readTheme);
   const [toast, setToast] = useState<string | null>(null);
 
   const refresh = async () => {
@@ -63,14 +47,6 @@ export default function App() {
     const t = setInterval(refresh, 2000);
     return () => clearInterval(t);
   }, []);
-
-  // Theme: "system" follows the OS; an explicit pick is remembered on this device.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", theme);
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* private window: theme just won't persist */ }
-  }, [theme]);
 
   // Short-lived confirmation after an action, so a click always answers back.
   useEffect(() => {
@@ -110,16 +86,12 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  const dark = theme === "dark" || (theme === "system" && systemDark());
-  const toggleTheme = () => setTheme(dark ? "light" : "dark");
-
-  // Keys 1-6 switch views, T toggles the theme. Ignored while typing or with a drawer open.
+  // Keys 1-6 switch views. Ignored while typing or with a drawer open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || openId) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
-      if (e.key.toLowerCase() === "t") return toggleTheme();
       const n = Number(e.key);
       if (n >= 1 && n <= NAV.length) go(NAV[n - 1].id);
     };
@@ -224,11 +196,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button className="nav-item theme-toggle" onClick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>
-          <span className="nav-icon" aria-hidden="true">{dark ? "☀" : "☾"}</span>
-          {dark ? "Light mode" : "Dark mode"}
-          <kbd className="keyhint" aria-hidden="true">T</kbd>
-        </button>
         <p className="muted small keyhint-line">Keys 1–6 switch views</p>
         <div className="team-card">
           <span className={`status ${running ? "on" : ""}`} role="status">
@@ -246,7 +213,6 @@ export default function App() {
           <strong>{health?.dealer_name ?? "Your dealership"}</strong>
           <div className="row">
             <span className={`status ${running ? "on" : ""}`}><i aria-hidden="true" />{running ? "Shift on" : "Idle"}</span>
-            <button className="quiet" onClick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? "☀" : "☾"}</button>
             <button className="quiet" onClick={() => go("setup")}>Setup</button>
           </div>
         </header>
