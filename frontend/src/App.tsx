@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import BrainView from "./BrainView";
 import DealPanel from "./DealPanel";
 import DealsList, { type Column, type Filter } from "./DealsList";
-import EvalView from "./EvalView";
+import DealerInsights from "./DealerInsights";
 import ShiftView from "./ShiftView";
 import MoneyView from "./MoneyView";
 import OnboardingView from "./OnboardingView";
@@ -38,7 +37,6 @@ const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").mat
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
-  const [teamTab, setTeamTab] = useState<"money" | "memory" | "results">("memory");
   // Everything on screen comes from the backend. Nothing is shown until it answers.
   const [health, setHealth] = useState<Health | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -264,7 +262,7 @@ export default function App() {
           {section === "home" && (
             <ShiftView health={health} deals={deals} events={events} brain={brain} evalResult={evalResult}
               onStart={startShift} onStop={stopShift} onOpen={setOpenId} onDecide={decide} onSale={saleDecide}
-              onInsights={() => { setTeamTab("results"); go("team"); }} />
+              onInsights={() => go("team")} />
           )}
           {section === "buying" && (
             <DealsList title="Buying" intro="Cars we found, valued and are negotiating. We check resale price and profit before any buy."
@@ -303,20 +301,9 @@ export default function App() {
             <div className="stack">
               <header className="page-head">
                 <h1>Insights</h1>
-                <p>The shared brain every agent reads before work and writes after, and what it measurably changes.</p>
+                <p>What the team did for you, what it earned, and what is waiting for your decision.</p>
               </header>
-              <div className="seg seg-lg" role="group" aria-label="Insights view">
-                <button aria-pressed={teamTab === "memory"} onClick={() => setTeamTab("memory")}>Shared brain</button>
-                <button aria-pressed={teamTab === "results"} onClick={() => setTeamTab("results")}>Brain off vs on</button>
-                <button aria-pressed={teamTab === "money"} onClick={() => setTeamTab("money")}>Money</button>
-              </div>
-              {teamTab === "money" ? (
-                <MoneyView deals={deals} />
-              ) : teamTab === "memory" ? (
-                <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />
-              ) : (
-                <EvalView result={evalResult} onRerun={() => api.runEval().then(refresh)} />
-              )}
+              <DealerInsights deals={deals} events={events} />
             </div>
           )}
           {section === "setup" && (
