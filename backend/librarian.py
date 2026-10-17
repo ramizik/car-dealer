@@ -111,4 +111,4 @@ def tiers() -> dict:
     chats = sorted(conversations.ROOT.glob("*.md")) if conversations.ROOT.exists() else []
     return {"private_chats": len(chats),
             "shared_writes": len(evs) - len(private), "private_writes": len(private),
-            "lessons": lessons_now, "mistakes": skills.mistakes("buyer/outreach")}
+            "lessons": lessons_now, "mistakes": skills.mistakes("buyer/outreach"), "vectors": vector_memory.stats()}

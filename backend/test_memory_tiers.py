@@ -9,12 +9,14 @@ import librarian
 import llm
 import memory_layer
 import skills
+import vector_memory
 
 # isolate from real data
 tmp = Path(tempfile.mkdtemp())
 brain.DIR, brain.LOG, brain.SNAPSHOTS = tmp, tmp / "events.jsonl", tmp / "snapshots"
 conversations.ROOT = tmp / "conversations"
 skills.ROOT = tmp / "skills"
+vector_memory.PATH = tmp / "vectors.jsonl"
 brain.reset()
 
 
@@ -58,12 +60,19 @@ async def main():
     pb = "\n".join(brain.recall("playbook", keys=["|motivated_private"], agent="negotiator"))
     assert "lesson:" in pb, "negotiator recalls the lesson next deal"
 
+    # Tier 3 vector store: similar past deals, mistakes visible to the negotiator only
+    assert out["vectors_added"] > 0
+    hits = vector_memory.search("seller walked away no deal", agent="negotiator", scopes=["deals", "lessons", "mistakes"])
+    assert hits and any("walked away" in h["text"] for h in hits), hits
+    assert not vector_memory.search("seller walked away", agent="merchandiser", scopes=["mistakes"]), "mistakes are negotiator-only"
+    assert not any("chat gist" in r["text"] for r in vector_memory._load()), "private gists never reach the vector store"
+
     # compaction never changes what agents recall
     before = brain.recall(brain.SCOPES, agent="negotiator", budget_chars=5000)
     c = librarian.compact()
     assert c["applied"] and brain.recall(brain.SCOPES, agent="negotiator", budget_chars=5000) == before
     print(f"memory tiers ok: T1 masked+closed, T2 shared/private split, T3 {len(out['lessons'])} lesson(s) + "
-          f"{len(out['mistakes'])} mistake(s), compaction {c['events_before']}->{c['events_after']} events, recall unchanged")
+          f"{len(out['mistakes'])} mistake(s), {out['vectors_added']} vectors, compaction {c['events_before']}->{c['events_after']} events, recall unchanged")
 
 
 asyncio.run(main())

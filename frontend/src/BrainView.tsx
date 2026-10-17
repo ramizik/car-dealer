@@ -53,8 +53,9 @@ export default function BrainView({ brain, onSnapshot }: Props) {
             <span className="v mono">{brain.tiers.shared_writes}</span> <span className="small muted">shared writes</span>
           </div>
           <div className="scope">
-            <h3>3. Lessons</h3>
-            <p className="small">Distilled by the librarian every 3 deals.</p>
+            <h3>3. Long-term lessons</h3>
+            <p className="small">Distilled by the librarian every 3 deals. Similar past deals are searched before each talk.</p>
+            {brain.tiers.vectors && <p className="small muted">{brain.tiers.vectors.memories} memories in the vector store</p>}
             {brain.tiers.lessons.length === 0 ? <p className="empty">None yet</p> :
               brain.tiers.lessons.map((l) => <span key={l} className="small fact-line">{l.replace(/^lesson: /, "")}</span>)}
           </div>
