@@ -133,6 +133,8 @@ Same FastAPI process. "Several agents" = several functions + a queue, not severa
 
 ### 5.1 Per-agent skill + mistake files
 
+**In code:** `backend/skills.py`. `skills.load(agent, voice=...)` returns the agent's own `SKILL.md`, the shared playbook, the voice-calls skill when voice is on, and its top 5 `MISTAKES.md` lines. `skills.record_mistake(agent, line)` prepends a dated line and bumps `hits` on a repeat. The negotiator (`buyer/outreach`) already does both: it emits a `skill` event and shows its mistakes as Recalled chips, and a scam link writes a mistake line.
+
 Every agent has **its own skill folder**. Company facts stay in the shared brain. Craft and failures stay on the worker that made them, so Facebook's "don't open off-platform links" does not bloat the Craigslist seller prompt.
 
 ```
@@ -237,6 +239,7 @@ The UI shows **"Recalled:"** chips under every agent action, so the audience can
 | **NVIDIA OpenShell** | Sandbox with a YAML network policy. Egress is allowed only to Crusoe inference, You.com and the dealer storefront. Everything else is blocked and surfaces for operator approval. Inference credentials stay in the OpenShell gateway, outside the sandbox. | **Scam moment:** a simulated seller sends a "verify payment" link to an unknown domain. The agent tries to open it, OpenShell blocks it, and the request shows up for operator review. The brain writes a red flag on that seller. |
 | **NVIDIA Nemotron** (Nemotron 3 / 3.5 family) | **Super 120B** for negotiation and appraisal reasoning (Ultra 550B if `/v1/models` shows it for our project). **3.5 Lightning** for the librarian and the simulated sellers and buyers. **Nano 30B** for extraction and classification. **Nano Omni** for listing-photo condition checks (image input confirmed; stretch). Optional local Nemotron for private dealer data (stretch). Roles are spread across models on purpose, because Crusoe rate limits are per model. | A model badge on each agent action shows which Nemotron handled it. |
 | **Crusoe Managed Inference** | Hosts every Nemotron call through an OpenAI-compatible API at `https://api.inference.crusoecloud.com/v1` (`backend/llm.py`). | Latency and token counter in the footer. A burst of parallel negotiations shows throughput. |
+| **NVIDIA Speech (Parakeet + Magpie)** | Voice mode for the buyer and seller agents (`backend/voice.py`). Parakeet transcribes the counterparty, and Magpie speaks the agent's line. Once a seller is interested, the agent asks for a callback number and logs a masked call request. No real call is placed from the hackathon build. | Deal drawer: a play button on agent messages, and a "callback set +1******1234" event. |
 | **You.com Search API** | Scout finds real, current listings (`POST ydc-index.io/v1/search`). | Live feed of real listings with their source sites. |
 | **You.com Contents API** | Pulls the full listing page as Markdown for structured extraction (`POST ydc-index.io/v1/contents`). | "Parsed listing" card: year, trim, miles, price, VIN if present. |
 | **You.com Research API** | Appraiser gets a cited valuation and common-issues report (`POST api.you.com/v1/research`). | Valuation card with clickable citations. These citations feed `market` brain records. |

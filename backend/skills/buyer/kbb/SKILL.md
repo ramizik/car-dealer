@@ -6,7 +6,7 @@
 
 1. Read own skill + top `MISTAKES.md` lines.
 2. `brain.recall` for this make/model/year segment (recent `market` observations, `playbook` stats).
-3. You.com **Research** for a cited valuation: retail range, trade range, typical mileage adjustment. Keep source URLs.
+3. Code: `youcom.research(question, effort="lite")` returns `{content, sources}` in about 5s and is cached on disk. You.com **Research** for a cited valuation: retail range, trade range, typical mileage adjustment. Keep source URLs.
 4. Adjust for miles, title (clean only), accidents, known issues. Write each adjustment as a line in the valuation.
 5. `max_buy = min(0.92 * retail_comp_median, retail_comp_median - target_gross)`, using the dealer target gross (12-15%).
 6. Reject automatically if: title not clean, miles over 120k, comps fewer than 3, or comps older than the TTL.

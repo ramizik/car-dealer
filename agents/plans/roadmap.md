@@ -130,6 +130,24 @@ Step IDs keep their original lane letter (A/B/C/D) so history stays readable. A 
 
 ## P2: Swarm pipeline + API (T+1:30 to 2:45)
 
+### Status snapshot (2026-10-17)
+
+Working and pushed:
+- `brain.py` (order-independent reducer, recall, snapshots) and `llm.py` (tiers, throttle, mock mode).
+- `youcom.py`: live Search, Contents and Research, a disk cache, and `DEMO_MODE` (32 real listings cached for Joe's 4 models).
+- `sim.py`: deterministic sellers, buyers and owner, with `scenarios(1, 30)` split 20/10.
+- `agents.negotiate`: segment classifier, tactic pick from the playbook, voice hooks, callback capture, and the scam-link block.
+- `voice.py`: Parakeet and Magpie on NVCF, plus `extract_phone` and `record_callback`. It falls back to text without `NVIDIA_API_KEY`.
+- `skills.py` plus `backend/skills/*/SKILL.md` (10 agents): read-before is wired into `negotiate`, and a scam link writes `buyer/outreach/MISTAKES.md`.
+- Frontend: dealer setup, plus Shift, Brain and Results tabs on fixtures.
+
+Not connected yet (critical path):
+- There is no `swarm.py` and no `/shift/*` endpoints. `main.py` still serves the old `loop.py` `/run`.
+- `scout`, `appraise`, `owner_review`, `list`, `sell` and `logistics` don't exist yet. Each one should call `skills.load(<agent>)` and use the `youcom.*` functions.
+- `agent_tiers.tier_for` isn't used by any call yet.
+- `eval.py` (brain OFF vs ON, the headline number) is not started.
+- The UI still runs on fixtures, with no live API calls.
+
 ### Lane B: Agents, shift loop, API
 
 | Done | # | Step | File | Done when |

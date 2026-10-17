@@ -6,7 +6,8 @@
 
 1. Read own skill + top `MISTAKES.md` lines.
 2. `brain.recall` for the lot profile (makes, price band $8k-$45k, miles under 120k, clean title only) and recently rejected listings.
-3. You.com **Search** with a site-scoped query per source, then **Contents** for the top hits. Dedupe by URL and by VIN/title+price.
+3. Code: `youcom.find_listing_urls(profile)` then `youcom.fetch_listings(items)`. The craigslist `cto` query returns real listing pages (Contents is blocked there, so the search snippets are parsed). Aggregator pages (cars.com, truecar) are parsed into many listings. If results are thin, fall back to `youcom.seed_listings()`.
+   You.com **Search** with a site-scoped query per source, then **Contents** for the top hits. Dedupe by URL and by VIN/title+price.
 4. Pre-filter: price in band, title not salvage or rebuilt, not already seen, source on the allowlist.
 5. For each survivor, call the KBB buyer for `max_buy`. Keep it only if the listing ask is at or under `max_buy` plus a small margin for negotiation.
 6. Write one `listing_seen` event per URL (source, ask, miles, title status) and a source-quality counter (matches per query).

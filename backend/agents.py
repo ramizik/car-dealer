@@ -10,6 +10,7 @@ import re
 
 import brain
 import llm
+import skills
 import voice
 
 # Tactic names are shared with sim.py (names only; the persona -> weak_to mapping stays hidden there).
@@ -118,6 +119,9 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
 
     # recall: what we know about this seller and the dealer
     memory = brain.recall(["party", "dealer"], keys=[party, deal.get("dealer_key", "joes-auto")], agent="negotiator")
+    skill = skills.load("buyer/outreach", voice=voice_on)  # read-before: own skill + top mistakes
+    memory = skill["mistakes"] + memory
+    emit("negotiator", "skill", f"read {', '.join(skill['files'])}", {"deal_id": deal_id, "mistakes": skill["mistakes"]})
     emit("negotiator", "recall", f"{len(memory)} memories", {"deal_id": deal_id, "lines": memory})
     segment = await classify_segment(seller_text)
     known = brain.get("party", party)
@@ -155,6 +159,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             dropped = "seller sent an off-platform payment link"
             brain.write("negotiator", "party", party, "fact", True, attr="red_flag", confidence=0.9, source=f"chat:{deal_id}")
             emit("negotiator", "blocked", f"Red flag: {dropped}", {"deal_id": deal_id})
+            skills.record_mistake("buyer/outreach", "Off-platform payment link in seller chat: flag the party, never open it")
             break
 
         # Interested seller: ask once for a callback number, or take the number they just gave.
