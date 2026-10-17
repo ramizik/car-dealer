@@ -16,6 +16,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
   const step = STAGES.findIndex((s) => s.state === deal.state);
   const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
   const stopped = deal.state === "dropped";
+  const memory = events.filter((e) => e.deal_id === deal.id && e.type === "write" && typeof e.data.artifact === "string");
 
   // Escape closes, and focus starts on the close button so keyboard users are not lost behind the scrim.
   useEffect(() => {
@@ -71,11 +72,30 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
           <Num label="Your max" value={money(deal.max_buy)} />
           <Num label="Our offer" value={money(deal.offer)} />
           <Num label="Paid" value={money(deal.bought_for)} />
+          <Num label="Shipping" value={money(deal.shipping)} />
           <Num label="Listed at" value={money(deal.list_price)} />
           <Num label="Profit" value={money(profit(deal))} />
         </dl>
 
         {deal.valuation && <Valuation {...deal.valuation} />}
+
+        {deal.listing && (
+          <section aria-labelledby="listing">
+            <h3 id="listing">Storefront listing</h3>
+            <div className="listing-copy">
+              <strong>{deal.listing.title}</strong>
+              <p>{deal.listing.description}</p>
+              <ul>{deal.listing.bullets.map((b) => <li key={b}>{b}</li>)}</ul>
+            </div>
+          </section>
+        )}
+
+        {memory.length > 0 && (
+          <section aria-labelledby="saved">
+            <h3 id="saved">Saved to team memory</h3>
+            <ul className="sources">{memory.map((e) => <li key={e.id} className="small">{e.text.replace("Saved to memory: ", "")}</li>)}</ul>
+          </section>
+        )}
 
         {deal.chat.length > 0 && (
           <section aria-labelledby="conversation">
@@ -86,6 +106,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
                   <span className="who">
                     {t.from === "agent" ? "You (via us)" : t.from === "buyer" ? "Buyer" : "Seller"}
                     {t.channel && <span className="tag channel">{CHANNEL_LABELS[t.channel] ?? t.channel}</span>}
+                    {t.tactic && <span className="tag">{t.tactic.replace(/_/g, " ")}</span>}
                   </span>
                   <p>{t.text}</p>
                   {t.recalled && t.recalled.length > 0 && (

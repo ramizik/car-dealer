@@ -1,6 +1,7 @@
-import type { EvalResult, EvalSide } from "./types";
+import { money } from "./format";
+import type { EvalResult, EvalRow, EvalSide } from "./types";
 
-type Props = { result: EvalResult | null };
+type Props = { result: EvalResult | null; onRerun: () => void };
 
 const METRICS: { key: keyof EvalSide; name: string; unit: string; scale?: number; higher: boolean }[] = [
   { key: "close_rate", name: "Close rate", unit: "%", scale: 100, higher: true },
@@ -12,17 +13,29 @@ const METRICS: { key: keyof EvalSide; name: string; unit: string; scale?: number
 ];
 
 // Real numbers from the last backend/eval.py run: same unseen sellers with the shared brain off, then on.
-export default function EvalView({ result }: Props) {
+export default function EvalView({ result, onRerun }: Props) {
   if (!result || result.missing || !result.on || !result.off) {
     return (
       <p className="empty-card">
-        No measured run yet. In <code>backend</code>, run <code>SIM_FAST=1 python eval.py</code> and this page fills in.
+        No measured run yet. <button onClick={onRerun} disabled={result?.running}>{result?.running ? "Running..." : "Run eval (about 20 s)"}</button>
       </p>
     );
   }
   const { on, off } = result;
   return (
     <>
+      <section className="eval-head" aria-label="Headline result">
+        <p className="big-number mono">
+          {Math.round(on.surplus_captured_pct)}% <span className="muted">vs</span> {Math.round(off.surplus_captured_pct)}%
+        </p>
+        <p>
+          On {result.heldout_n} sellers the team never met, with the shared brain on it captured{" "}
+          <strong>{Math.round(on.surplus_captured_pct)}%</strong> of the negotiable surplus vs{" "}
+          <strong>{Math.round(off.surplus_captured_pct)}%</strong> with it off, and closed {on.closed}/{on.legit} vs {off.closed}/{off.legit}.
+        </p>
+        <button onClick={onRerun} disabled={result.running}>{result.running ? "Re-running..." : "Re-run eval"}</button>
+      </section>
+
       <p className="muted small">
         {result.heldout_n} sellers the team never met, run with the brain off, then on after {result.train_n} training deals.
         {result.ran_at ? ` Last run ${new Date(result.ran_at * 1000).toLocaleString("en-US")}.` : ""}
@@ -54,7 +67,40 @@ export default function EvalView({ result }: Props) {
           );
         })}
       </section>
+
+      {result.rows && <Scenarios off={result.rows.off} on={result.rows.on} />}
     </>
+  );
+}
+
+// Same seller, brain off vs on: which tactic each side picked and what it paid.
+function Scenarios({ off, on }: { off: EvalRow[]; on: EvalRow[] }) {
+  const cell = (r?: EvalRow) =>
+    !r ? "—" : r.scam ? (r.closed ? "paid a scammer" : "blocked scam") : r.closed ? `${money(r.price ?? 0)} · ${r.rounds} rds` : r.dropped || "no deal";
+  return (
+    <section aria-labelledby="per-seller">
+      <h2 id="per-seller">Per seller</h2>
+      <table>
+        <thead>
+          <tr><th>Seller</th><th>Type</th><th className="num">Asking</th><th>Brain off</th><th>Brain on</th></tr>
+        </thead>
+        <tbody>
+          {on.map((r) => {
+            const o = off.find((x) => x.id === r.id);
+            const better = o && r.closed && (!o.closed || (r.price ?? 0) < (o.price ?? 0));
+            return (
+              <tr key={r.id}>
+                <td className="mono small">{r.id}</td>
+                <td>{r.persona.replace(/_/g, " ")}</td>
+                <td className="num mono">{money(r.ask)}</td>
+                <td className="small">{o?.tactic.replace(/_/g, " ")} · {cell(o)}</td>
+                <td className={`small ${better ? "good" : ""}`}>{r.tactic.replace(/_/g, " ")} · {cell(r)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

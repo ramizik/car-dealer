@@ -124,6 +124,21 @@ export default function BrainView({ brain, onSnapshot }: Props) {
         </section>
       )}
 
+      <section aria-labelledby="lean">
+        <h2 id="lean">Lean memory</h2>
+        {brain.last_tidy ? (
+          <div className="lean">
+            <span>Librarian last tidied: <b className="mono">{brain.last_tidy.events_before}</b> to <b className="mono">{brain.last_tidy.events_after}</b> entries,{" "}
+              <b className="mono">{brain.last_tidy.kb_before}</b> to <b className="mono">{brain.last_tidy.kb_after}</b> KB, same answers on recall</span>
+            <div className="bar" role="img" aria-label="Share of entries kept after tidy">
+              <div style={{ width: `${(brain.last_tidy.events_after / (brain.last_tidy.events_before || 1)) * 100}%` }} />
+            </div>
+          </div>
+        ) : (
+          <p className="empty">The librarian tidies memory every 3 deals. Nothing tidied yet this session.</p>
+        )}
+      </section>
+
       <section className="row" aria-label="Brain snapshots">
         <span className="muted small">Snapshots</span>
         <button onClick={() => onSnapshot("cold")}>Load empty brain</button>

@@ -220,7 +220,7 @@ export default function App() {
               ) : teamTab === "memory" ? (
                 <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />
               ) : (
-                <EvalView result={evalResult} />
+                <EvalView result={evalResult} onRerun={() => api.runEval().then(refresh)} />
               )}
             </div>
           )}

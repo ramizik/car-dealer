@@ -95,7 +95,6 @@ export type Brain = {
   scopes: Record<"dealer" | "party" | "market" | "playbook", Record<string, BrainEntry>>;
   conflicts: { scope: string; key: string; attr: string; values: string[]; chosen: unknown }[];
   playbook: PlaybookRow[];
-  tiers?: { private_chats: number; shared_writes: number; private_writes: number; lessons: string[]; mistakes: string[] };
   stats: { enabled: boolean; events: number; bytes: number; per_scope: Record<string, number>; keys: Record<string, number>; conflicts: number };
   tiers?: { private_chats: number; shared_writes: number; private_writes: number; lessons: string[]; mistakes: string[] };
   last_tidy?: { ts: number; events_before: number; events_after: number; kb_before: number; kb_after: number; applied: boolean; lessons: number } | null;

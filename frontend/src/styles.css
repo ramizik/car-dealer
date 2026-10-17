@@ -414,3 +414,13 @@ table.mini th, table.mini td { padding: 8px 12px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; }
 }
+
+/* Eval headline, lean meter, listing copy */
+.eval-head { padding: 18px 20px; margin-bottom: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.eval-head p { margin: 0 0 10px; }
+.big-number { font-size: 44px; font-weight: 800; color: var(--brand); line-height: 1.1; }
+.big-number .muted { font-size: 22px; font-weight: 500; }
+.lean { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.lean .bar { max-width: 260px; }
+.listing-copy { padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); font-size: 14px; }
+.listing-copy ul { margin: 6px 0 0; padding-left: 18px; }
