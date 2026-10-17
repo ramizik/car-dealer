@@ -526,15 +526,16 @@ button:not(:disabled):active { transform: scale(0.97); }
 .now-card.now-you .now-label { color: var(--attn); }
 .now-card.now-stopped { border-color: var(--danger); background: var(--danger-soft); }
 .now-card.now-done { background: var(--ok-soft); }
-.rail { position: relative; list-style: none; margin: 12px 0 10px; padding: 0; display: grid; gap: 0; }
-.rail::before { content: ""; position: absolute; left: 6px; top: 13px; bottom: 13px; width: 2px; background: var(--track); }
-.rail li { position: relative; display: flex; align-items: center; gap: 12px; min-height: 26px; font-size: 14px; color: var(--ink-3); }
-.rail-dot { position: relative; flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); }
-.rail li.done { color: var(--ink-2); }
-.rail li.done .rail-dot { background: var(--ok); border-color: var(--ok); }
-.rail li.now { color: var(--ink); font-weight: 700; }
-.rail li.now .rail-dot { background: var(--brand); border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
-.rail-tag { margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--brand); }
+.steps { margin: 14px 0 18px; }
+.steps-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 8px; }
+.phases { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+.phases li { flex-basis: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.segs { display: flex; gap: 3px; }
+.seg { flex: 1; height: 8px; border-radius: 999px; background: var(--track); }
+.seg.done { background: var(--ok); }
+.seg.now { background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.phase-l { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phase-l.on { color: var(--brand); font-weight: 700; }
 .needs-you { margin-bottom: 16px; padding: 14px; border-radius: var(--radius); border: 2px solid var(--attn); background: var(--surface); }
 .needs-you h2 { font-size: 16px; margin-bottom: 8px; }
 .needs-you ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { api } from "./api";
-import { CRAIGSLIST_POST, STAGES, craigslistDraft, money, profit, time } from "./format";
+import { COLUMNS, CRAIGSLIST_POST, STAGES, craigslistDraft, money, profit, time } from "./format";
 import type { AgentEvent, Deal } from "./types";
 import { CHANNEL_LABELS } from "./channels";
 import SellerTurn from "./SellerTurn";
@@ -24,15 +24,22 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
   const memory = events.filter((e) => e.deal_id === deal.id && e.type === "write" && typeof e.data.artifact === "string");
   const lastAudio = deal.chat.map((t) => Boolean(t.audio_url)).lastIndexOf(true);
 
+  // onClose is a new function on every 2s poll; keep it in a ref so focus is not re-applied (which scrolls the drawer to the top).
+  const closeFn = useRef(onClose);
+  closeFn.current = onClose;
+
   // Escape closes, and focus starts on the close button so keyboard users are not lost behind the scrim.
   useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    closeRef.current?.focus({ preventScroll: true });
+  }, [deal.id]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeFn.current();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
-  const progress = stopped || step < 0 ? 0 : ((step + 1) / STAGES.length) * 100;
+  const at = stopped ? -1 : step;
+  const shown = STAGES[Math.max(0, step)];
 
   return (
     <div className="scrim" onClick={onClose}>
@@ -58,24 +65,27 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           );
         })()}
 
-        {/* Every step of the deal, top to bottom, so it is clear where this car is. */}
-        <ol className="rail" aria-label="Deal steps">
-          {STAGES.map((s, i) => {
-            const at = stopped ? -1 : step;
-            const cls = i < at ? "done" : i === at ? "now" : "todo";
-            return (
-              <li key={s.state} className={cls} aria-current={cls === "now" ? "step" : undefined}>
-                <span className="rail-dot" aria-hidden />
-                {s.label}
-                {cls === "now" && <span className="rail-tag">Now</span>}
+        {/* Where this car is: one segment per step, grouped into the four phases a dealer thinks in. */}
+        <section className="steps" aria-label="Deal steps">
+          <p className="steps-head">
+            <strong>{stopped ? "Stopped" : shown.label}</strong>
+            <span className="muted small">{stopped ? "Later steps did not run" : `Step ${step + 1} of ${STAGES.length}`}</span>
+          </p>
+          <ol className="phases">
+            {COLUMNS.map((col) => (
+              <li key={col.title} style={{ flexGrow: col.states.length }}>
+                <div className="segs">
+                  {col.states.map((s) => {
+                    const i = STAGES.findIndex((x) => x.state === s);
+                    const cls = i < at ? "done" : i === at ? "now" : "todo";
+                    return <span key={s} className={`seg ${cls}`} title={STAGES[i].label} aria-current={cls === "now" ? "step" : undefined} />;
+                  })}
+                </div>
+                <span className={`phase-l ${col.states.includes(deal.state) ? "on" : ""}`}>{col.title}</span>
               </li>
-            );
-          })}
-        </ol>
-        {stopped && <p className="small muted">Stopped before step {Math.max(0, step) + 1}. Steps after this did not run.</p>}
-        <div className="progress" role="img" aria-label={`${Math.round(progress)}% through the process`}>
-          <div style={{ width: `${progress}%` }} />
-        </div>
+            ))}
+          </ol>
+        </section>
 
         {!stopped && (deal.live || deal.turn) && <TurnBanner deal={deal} />}
         {!stopped && deal.turn?.who === "seller" && <SellerTurn dealId={deal.id} offer={deal.turn.offer} />}
