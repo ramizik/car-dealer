@@ -10,6 +10,9 @@ backend/skills/
   buyer/outreach/                  text and talk to sellers who posted cars
   seller/listing/                  build and publish the listing pack per channel
   seller/enquiry/                  answer buyer enquiries, qualify, close above floor
+  dealer/onboarding/               dealer profile, approvals, inventory, authority
+  dealer/consignment-listing/      list a dealer's inventory on their chosen platforms
+  dealer/auction/                  watch run lists, bid within the dealer's max, with YES
 ```
 
 Read-before / write-after, every agent:
