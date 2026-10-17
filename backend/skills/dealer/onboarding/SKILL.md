@@ -14,14 +14,16 @@
 
 1. Dealership type: independent lot, franchise, wholesale only.
 2. Car segments: premium, supercars, everyday (default), family and SUVs, or all of them.
-3. Where to list for sale: our website (default), Facebook Marketplace, Craigslist, Autotrader.
-4. Car types to buy: trucks, SUVs, sedans, electric, anything (default).
-5. Price range: under $15k, $15k to $30k (default), $30k to $45k, over $45k.
-6. Highest mileage: under 80k, under 120k (default), any.
-7. Titles: clean only (default), or rebuilt too but ask first.
-8. Auctions: ask before each bid (default), bid automatically within max, or no auctions.
-9. Who approves: me by text (default), me in this dashboard, my manager.
-10. Adding cars: add later (default), upload a spreadsheet, send a list by text.
+3. Brands they sell: Toyota, Honda, Ford, Chevrolet, Nissan, Subaru, Hyundai/Kia, BMW, Mercedes-Benz, Audi, Lexus, Tesla, other.
+4. Brands they want to buy: same list.
+5. Where to list for sale: our website (default), Facebook Marketplace, Craigslist, Autotrader.
+6. Car types to buy: trucks, SUVs, sedans, electric, anything (default).
+7. Price range: under $15k, $15k to $30k (default), $30k to $45k, over $45k.
+8. Highest mileage: under 80k, under 120k (default), any.
+9. Titles: clean only (default), or rebuilt too but ask first.
+10. Auctions: ask before each bid (default), bid automatically within max, or no auctions.
+11. Who approves: me by text (default), me in this dashboard, my manager.
+12. Adding cars: add later (default), upload a spreadsheet, send a list by text.
 
 Then: approver phone number (only if they chose "me by text") and one authority tick: "Let the team list and bid within these choices."
 
