@@ -5,6 +5,7 @@ Each sub-agent has its own folder: `SKILL.md` (how it works) and `MISTAKES.md` (
 ```
 backend/skills/
   shared/sales-playbook/SKILL.md   craft shared by every talking agent (read first)
+  shared/voice-calls/SKILL.md      Parakeet (speech in), Magpie (speech out), callback number capture
   buyer/kbb/                       valuation: book comps, max buy
   buyer/marketplace/               search Facebook / Craigslist / Autotrader-style listings
   buyer/outreach/                  text and talk to sellers who posted cars
