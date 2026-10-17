@@ -271,7 +271,7 @@ async def _one(i: int, sc: dict) -> None:
                                sim.make_seller(sc), emit=emit)
     deal["chat"] = _chat(r)
     # Write-ahead: squeeze the chat into one artifact + status for the shared brain; raw chat stays private.
-    mem = await memory_layer.consolidate("negotiator", f"seller:{sc['seller']['sid']}", deal_id, r)
+    mem = await memory_layer.consolidate("negotiator", f"seller:{sc['seller']['sid']}", deal_id, r, deal["car"])
     emit("negotiator", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal_id, **mem})
     if not r["closed"]:
         deal.update(state="dropped", drop_reason=r.get("dropped") or "no deal")

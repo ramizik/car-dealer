@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 import brain
 import conversations
 import skills
+import vector_memory
 
 MIN_TRIES = 3  # a tactic needs this many tries before it is called a lesson
 MIN_REPEATS = 2  # a failure reason needs this many deals before it is a mistake
@@ -35,7 +36,7 @@ def mistakes() -> list[str]:
     reasons = Counter()
     for entry in brain.view()["scopes"]["party"].values():
         for n in entry["notes"]:
-            m = re.match(r"\[(FAILED|BLOCKED)\] no deal: (.+?);", n["text"])
+            m = re.match(r"\[(FAILED|BLOCKED)\] .*?no deal: (.+?);", n["text"])  # artifact may start with the car
             if m:
                 reasons[m.group(2)] += 1
     out = []
@@ -81,12 +82,24 @@ def compact() -> dict:
             "kb_before": round(before["bytes"] / 1024, 1), "kb_after": round(after["bytes"] / 1024, 1), "applied": same}
 
 
+def to_vectors(lesson_lines: list[str], mistake_lines: list[str]) -> int:
+    """Tier 3: lessons, mistakes and deal artifacts go into the embedded vector store for similar-deal search."""
+    added = sum(vector_memory.add(t, "lessons", source="librarian") for t in lesson_lines)
+    added += sum(vector_memory.add(t, "mistakes", agents=["negotiator"], source="librarian") for t in mistake_lines)
+    for key, entry in brain.view()["scopes"]["party"].items():
+        for n in entry["notes"]:
+            if re.match(r"\[(SUCCESS|FAILED|BLOCKED)\]", n["text"]):
+                added += vector_memory.add(n["text"], "deals", source=key)
+    return added
+
+
 def run(emit=None) -> dict:
     out = {"lessons": lessons(), "mistakes": mistakes(), "compaction": compact()}
+    out["vectors_added"] = to_vectors(out["lessons"], out["mistakes"])
     if emit:
         c = out["compaction"]
         emit("librarian", "write", f"Memory tidied: {c['events_before']} -> {c['events_after']} entries, "
-             f"{len(out['lessons'])} lessons, {len(out['mistakes'])} new mistakes", out)
+             f"{len(out['lessons'])} lessons, {len(out['mistakes'])} new mistakes, {out['vectors_added']} long-term memories", out)
     return out
 
 

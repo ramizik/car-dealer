@@ -42,9 +42,11 @@ async def _summary(party: str) -> str:
         return ""
 
 
-async def consolidate(agent: str, party: str, deal_id: str, result: dict) -> dict:
+async def consolidate(agent: str, party: str, deal_id: str, result: dict, car: str = "") -> dict:
     """Write-ahead consolidation after a deal. Returns {status, artifact, summary}."""
     status, artifact = status_of(result), artifact_of(result)
+    if car:
+        artifact = f"{car.split(' · ')[0]}: {artifact}"  # car name makes similar-deal search work
     # Tier 2: shared with every agent (buyer, sales desk, owner).
     brain.write(agent, "party", party, "note", f"[{status}] {artifact}", confidence=0.8, source=f"artifact:{deal_id}")
     brain.write(agent, "party", party, "fact", status, attr="last_status", confidence=0.8, source=f"artifact:{deal_id}")

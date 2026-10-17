@@ -12,6 +12,7 @@ import brain
 import conversations
 import dealer_memory
 import dealer_profile
+import vector_memory
 import llm
 from agent_tiers import tier_for
 import outreach
@@ -158,6 +159,11 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     tactic = pick_tactic(segment, epsilon, rng)
     pb = brain.recall("playbook", keys=[f"|{segment}"], agent="negotiator", budget_chars=400)
     memory += pb
+    # Tier 3: similar past deals from the long-term vector store (filtered to what the buyer may see).
+    similar = vector_memory.search(f"{deal.get('car', '')} {seller_text}", agent="negotiator", scopes=["deals", "lessons", "mistakes"])
+    if similar:
+        memory += [f"similar past: {s['text']}" for s in similar]
+        emit("negotiator", "recall", f"{len(similar)} similar past deals", {"deal_id": deal_id, "lines": [s["text"] for s in similar]})
     emit("negotiator", "recall", f"segment={segment}, tactic={tactic}", {"deal_id": deal_id, "lines": pb})
 
     # repeat seller: their last settled share of ask sets a better opening, not a hard ceiling
