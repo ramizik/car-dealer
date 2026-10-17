@@ -40,6 +40,16 @@ def mask_phone(phone: str) -> str:
     return f"{phone[:2]}******{phone[-4:]}" if phone else ""
 
 
+# Full callback numbers stay in this process only (never in the brain or logs). Lost on restart by design.
+CALLBACKS: dict[str, str] = {}
+
+
+def record_callback(party: str, phone: str) -> str:
+    """Keep the full number for the call desk, return the masked form for the brain and UI."""
+    CALLBACKS[party] = phone
+    return mask_phone(phone)
+
+
 def _function_id(model: str) -> str | None:
     """Look up an active NVCF function ID by model name, once per process."""
     if model in _function_ids:

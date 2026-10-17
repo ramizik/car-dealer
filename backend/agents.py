@@ -2,12 +2,14 @@
 
 Prices are decided in code (deterministic, clamped to max_buy); the LLM only writes the words.
 """
+import base64
 import os
 import random
 import re
 
 import brain
 import llm
+import voice
 
 # Canonical tactic names. sim.py personas pick their hidden `weak_to` from this list.
 TACTICS = ["anchor_low", "fast_cash_pickup", "cite_comps", "meet_halfway", "walk_away_threat"]
@@ -108,6 +110,10 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     ask, max_buy = float(deal["ask"]), float(deal["max_buy"])
     seller_text = deal.get("seller_text", "")
     dealer = deal.get("dealer", "Joe's Auto")
+    voice_on = bool(deal.get("voice"))  # voice mode: speak agent lines, transcribe seller audio when given
+    if voice_on and deal.get("seller_audio"):
+        seller_text = voice.transcribe(deal["seller_audio"]) or seller_text
+    asked_number = False
 
     # recall: what we know about this seller and the dealer
     memory = brain.recall(["party", "dealer"], keys=[party, deal.get("dealer_key", "joes-auto")], agent="negotiator")
@@ -133,7 +139,10 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         msg = await _message(deal, tactic, offer, r, seller_text, memory)
         if r == 0:
             msg = f"{msg} {DISCLOSURE.format(dealer=dealer)}"
-        transcript.append({"from": "agent", "text": msg, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []})
+        entry = {"from": "agent", "text": msg, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []}
+        if voice_on and (audio := voice.speak(msg)):
+            entry["audio_b64"] = base64.b64encode(audio).decode()
+        transcript.append(entry)
         emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic})
 
         accepted, counter, seller_text = seller.respond(offer, tactic)
@@ -145,6 +154,20 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             brain.write("negotiator", "party", party, "fact", True, attr="red_flag", confidence=0.9, source=f"chat:{deal_id}")
             emit("negotiator", "blocked", f"Red flag: {dropped}", {"deal_id": deal_id})
             break
+
+        # Interested seller: ask once for a callback number, or take the number they just gave.
+        phone = voice.extract_phone(seller_text or "")
+        if phone:
+            masked = voice.record_callback(party, phone)
+            brain.write("negotiator", "party", party, "fact", masked, attr="callback_masked", confidence=0.9, source=f"chat:{deal_id}")
+            ack = f"Thanks, the desk will ring you on {masked} to set up the call."
+            transcript.append({"from": "agent", "text": ack, "kind": "callback_set", "recalled": []})
+            emit("negotiator", "callback", ack, {"deal_id": deal_id, "phone": masked})
+        elif counter is not None and not asked_number and not accepted:
+            asked_number = True
+            ask = "Happy to set up a call. What number should the desk ring you on?"
+            transcript.append({"from": "agent", "text": ask, "kind": "ask_number", "recalled": []})
+            emit("negotiator", "message", ask, {"deal_id": deal_id, "kind": "ask_number"})
         if r == 0 and segment == "unknown":
             segment = await classify_segment(seller_text)
         if accepted:
