@@ -112,7 +112,7 @@ Owner Agent                          (GM: goals, YES/NO, who works which deal)
     └── Autotrader seller
 ```
 
-**Owner Agent** does not scrape or haggle. It assigns work, enforces policy, and is the only one that can approve a buy or a below-floor sell. It talks to the human GM (Telegram + dashboard).
+**Owner Agent** does not scrape or haggle. It assigns work, enforces policy, and is the only one that can approve a buy or a below-floor sell. It talks to the human GM through the dashboard, where every buy waits for Approve / Reject.
 
 **Buyer Agent** owns inbound inventory. It dispatches the platform buyer that matches the listing source. It rolls up offers and asks Owner for YES.
 
@@ -235,7 +235,7 @@ The UI shows **"Recalled:"** chips under every agent action, so the audience can
 
 | Sponsor tech | What we use it for | Visible demo moment |
 |---|---|---|
-| **NVIDIA NemoClaw** | Installs and runs the dealer's always-on agent on the dealer's own machine (`nemoclaw onboard`). An OpenClaw concierge agent lives in the sandbox and talks to the owner through a messaging channel. | Terminal: `nemoclaw list` shows the `dealer` sandbox running. Phone: Telegram message *"Approve 2019 Tacoma at $17,900? Est. margin 17%. Reply YES D-102."* |
+| **NVIDIA NemoClaw** | Installs and runs the dealer's always-on agent on the dealer's own machine (`nemoclaw onboard`). An OpenClaw concierge agent lives in the sandbox and drives the dealer API (start shift, briefing, approvals) on request. | Terminal: `nemoclaw list` shows the `dealer` sandbox running, and `nemoclaw dealer agent` answers "what happened overnight?" from the API. Owner approvals happen in the dashboard. |
 | **NVIDIA OpenShell** | Sandbox with a YAML network policy. Egress is allowed only to Crusoe inference, You.com and the dealer storefront. Everything else is blocked and surfaces for operator approval. Inference credentials stay in the OpenShell gateway, outside the sandbox. | **Scam moment:** a simulated seller sends a "verify payment" link to an unknown domain. The agent tries to open it, OpenShell blocks it, and the request shows up for operator review. The brain writes a red flag on that seller. |
 | **NVIDIA Nemotron** (Nemotron 3 / 3.5 family) | **Super 120B** for negotiation and appraisal reasoning (Ultra 550B if `/v1/models` shows it for our project). **3.5 Lightning** for the librarian and the simulated sellers and buyers. **Nano 30B** for extraction and classification. **Nano Omni** for listing-photo condition checks (image input confirmed; stretch). Optional local Nemotron for private dealer data (stretch). Roles are spread across models on purpose, because Crusoe rate limits are per model. | A model badge on each agent action shows which Nemotron handled it. |
 | **Crusoe Managed Inference** | Hosts every Nemotron call through an OpenAI-compatible API at `https://api.inference.crusoecloud.com/v1` (`backend/llm.py`). | Latency and token counter in the footer. A burst of parallel negotiations shows throughput. |
@@ -275,7 +275,7 @@ We will present only the numbers we actually measure. If the gain is small, we s
 ## 9. Architecture
 
 ```
-                 Owner's phone (Telegram)          Owner's browser (React dashboard)
+                 Owner's browser (React dashboard: approve / reject)
                           |                                     |
   +----------- Dealer's machine ---------------------------------------------------+
   |  NemoClaw  ->  OpenShell gateway (holds Crusoe + You.com keys, enforces policy)  |
@@ -307,11 +307,11 @@ We will present only the numbers we actually measure. If the gain is small, we s
 |---|---|---|
 | 0:00 | **Hook** | "Joe runs a 40-car lot alone. Last night his agents bought him a truck." Phone shows the overnight briefing. |
 | 0:20 | **Local and sandboxed** | Terminal: `nemoclaw list` shows the `dealer` sandbox. One sentence: runs on Joe's machine, Nemotron on Crusoe, keys held by OpenShell. |
-| 0:35 | **Start a shift** | Dashboard: Joe's profile comes from the brain. Click **Start shift** (or text "go find me Tacomas" on Telegram). |
+| 0:35 | **Start a shift** | Dashboard: Joe's profile comes from the brain. Click **Start shift**. |
 | 0:50 | **Live sourcing** | Watcher feed ticks: Facebook Marketplace / CL / Autotrader hits via You.com. Appraiser card shows a **cited** KBB-style You.com Research valuation and a clamped `max_buy`. |
 | 1:15 | **Buy-side talk with memory** | Owner assigned the deal to **Buyer Agent → FB buyer**. Split view: seller chat + Recalled chips + that agent's `MISTAKES.md` line. Offer lands under `max_buy`. |
 | 1:45 | **Scam blocked** | Another seller sends a "payment verification" link. The agent tries to open it and **OpenShell blocks it**. The block shows in the operator view, and a red flag appears on that seller in the Brain tab. |
-| 2:05 | **Owner approves from phone** | Telegram: "Approve $17,900?" The owner replies YES. Pipeline card moves to Bought, then In transit, with a shipping quote from You.com search. |
+| 2:05 | **Owner approves** | Dashboard: "Approve $17,900?" The owner clicks Approve. Pipeline card moves to Bought, then In transit, with a shipping quote from You.com search. |
 | 2:20 | **Sell side** | Merchandiser clones one listing pack onto storefront + FB/CL-style channel cards. Intake asks the buyer budget/needs; Closer sells above floor using `buyer:{id}` memory. |
 | 2:35 | **The proof** | Eval tab: brain OFF vs ON on 10 held-out deals. Headline: surplus captured X% vs Y% (measured live earlier). Brain tab: lessons learned, conflicts flagged, size kept lean. |
 | 2:55 | **Close** | "A dealership's memory, run by agents, on the dealer's own machine." |
@@ -364,7 +364,6 @@ We will present only the numbers we actually measure. If the gain is small, we s
 | You.com Research latency (seconds to a minute) | Medium | `research_effort: "lite"` live, results cached to disk, demo mode replays the cache. |
 | Search returns few usable listings | Medium | Pre-run queries and cache them. Seed 5 real listings as a guaranteed fallback. |
 | Eval shows a small or noisy gain | Medium | Deterministic simulator, fixed seeds, more held-out scenarios. Report honestly. |
-| Telegram channel flaky | Medium | The dashboard has the same Approve button, so the demo works without the phone. |
 | LLM returns broken JSON | High | `chat_json` retries once, then a safe default. Offers are always clamped in code. |
 
 ---
@@ -376,7 +375,7 @@ We will present only the numbers we actually measure. If the gain is small, we s
 3. Whether code inside the sandbox can call OpenShell's managed inference route (`inference.local`) so our backend never holds a key.
 4. Crusoe base URL is `https://api.inference.crusoecloud.com/v1`. **Confirmed on our project 2026-10-17** (`cd backend && python crusoe_check.py`): Super `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B`, Lightning `nvidia/Nemotron-3.5-Lightning-30B-A3B`, Nano `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, Nano Omni `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B`. Ultra is **not** enabled. Also available: `nvidia/NVIDIA-Nemotron-3.5-Super-VL` (120B multimodal, tool calling), an upgrade option for the vision tier. Source of truth: `.claude/skills/crusoe-recursive-agents-hackathon/SKILL.md`.
 5. You.com key works on all three endpoints (`X-API-Key` header) and the account has credits.
-6. Which messaging channel NemoClaw supports most reliably for our agent (target: Telegram).
+6. Messaging channel: decided, none. Owner approvals live in the dashboard.
 
 ---
 

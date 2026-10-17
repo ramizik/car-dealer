@@ -53,8 +53,6 @@ Onboard non-interactively against Crusoe (OpenAI-compatible). Put the key in you
 
 ```bash
 export COMPATIBLE_API_KEY="<PASTE_CRUSOE_API_KEY>"
-export TELEGRAM_BOT_TOKEN="<PASTE_BOT_TOKEN>"       # 1.A5, from @BotFather /newbot
-export TELEGRAM_ALLOWED_IDS="<OWNER_TELEGRAM_USER_ID>"
 NEMOCLAW_AGENT=openclaw \
 NEMOCLAW_PROVIDER=custom \
 NEMOCLAW_ENDPOINT_URL=https://api.inference.crusoecloud.com/v1 \
@@ -121,18 +119,18 @@ nemoclaw dealer skill install nemoclaw/skills/dealer/
 nemoclaw dealer skill list        # shows dealer-concierge
 ```
 
-Test from Telegram: "start a shift for Tacomas" must trigger `POST /shift/start` (watch the backend log).
+Test: `nemoclaw dealer agent --agent main -m "start a shift for Tacomas"` must trigger `POST /shift/start` (watch the backend log).
 
 ## 2.A4 Approval round trip
 
-The backend posts "Approve ... Reply YES D-102" (2.B7). The owner replies "YES D-102" on Telegram, and the concierge calls `POST /deals/D-102/approve`. Free-text reasons go to `PUT /dealer`.
+Decision: no Telegram. The owner approves or rejects in the React dashboard (Approve / Reject on the deal card), which calls `POST /deals/{id}/approve`. The concierge can do the same from `nemoclaw dealer agent` ("YES D-102"), calling `POST /deals/D-102/approve`. Free-text reasons go to `PUT /dealer`.
 
 ## 3.A1 Scam rehearsal (the OpenShell moment)
 
 The simulated scammer seller (`backend/sim.py`, persona `scammer`) sends a link on a reserved test domain (`secure-escrow-payments.example`). Nothing real is ever contacted.
 
 1. Start a shift that includes a scammer scenario.
-2. Ask the concierge on Telegram: "the seller sent a payment link, check it".
+2. Ask the concierge (`nemoclaw dealer agent --agent main -m "..."`): "the seller sent a payment link, check it".
 3. The request is blocked: `openshell term` shows a pending rule for the domain. Press `x`.
 4. Dashboard: a red `blocked` row. Brain tab: a `red_flag` on that seller. `backend/skills/buyer/outreach/MISTAKES.md` gets a dated line.
 

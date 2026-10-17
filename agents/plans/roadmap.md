@@ -21,7 +21,7 @@ Every step has an owner lane, the file it touches, and a **done when** check. If
 | Person | Lanes | Owns | Files |
 |---|---|---|---|
 | **1: Backend** | B + D | Shared brain, agents, swarm loop, API, You.com, simulator, eval | `backend/*` |
-| **2: NVIDIA + dashboard** | A + C | NemoClaw/OpenShell sandbox and policy, concierge, Telegram, React UI, demo flow, pitch | `nemoclaw/`, `.env.example`, `frontend/src/*` |
+| **2: NVIDIA + dashboard** | A + C | NemoClaw/OpenShell sandbox and policy, concierge, React UI, demo flow, pitch | `nemoclaw/`, `.env.example`, `frontend/src/*` |
 
 Step IDs keep their original lane letter (A/B/C/D) so history stays readable. A = Person 2, B = Person 1, C = Person 2, D = Person 1.
 
@@ -122,7 +122,7 @@ _Repo side done: `nemoclaw/SETUP.md` (runbook, docs-checked commands), `nemoclaw
 | [ ]  1.A2 | Talk to the OpenClaw agent in the sandbox (`nemoclaw launch dealer` or connect, whichever the docs show). Ask it "what model are you running on?" | same | Reply comes back through Crusoe Nemotron |
 | [ ]  1.A3 | `nemoclaw dealer policy list`. Find out how to add custom egress entries and where blocked requests surface (`openshell term` or the dashboard). | same | We can show a blocked request in an operator view |
 | [ ]  1.A4 | Write `nemoclaw/dealer-policy.yaml` (or a preset): allow `ydc-index.io`, `api.you.com`, the Crusoe inference host, `api.telegram.org`, and the dealer API host. Deny everything else. | `nemoclaw/dealer-policy.yaml` | Policy applied and visible in `policy list` |
-| [ ]  1.A5 | Create the Telegram bot (team member uses BotFather themselves) and keep the token in `.env` only. Configure the Telegram channel in NemoClaw onboarding or the channel command. | `.env` (not committed) | Owner's phone chats with the concierge |
+| [cut]  1.A5 | **Cut: no Telegram, owner approves in the dashboard.** Create the Telegram bot (team member uses BotFather themselves) and keep the token in `.env` only. Configure the Telegram channel in NemoClaw onboarding or the channel command. | `.env` (not committed) | Owner's phone chats with the concierge |
 
 **Timebox 1.A1–1.A5 to T+1:45.** If NemoClaw won't install on our hardware by then, try a Linux cloud VM for 20 minutes. If that fails too, use the **Plan B-lite** fallback in §P2-A.
 
@@ -160,7 +160,7 @@ Not connected yet (critical path):
 | [x]  2.B4 | `classify_segment(seller_text)`: Nano returns `motivated_private \| price_anchored \| haggler \| wholesaler_repeat \| unknown`, with a keyword fallback. | same | ≥80% correct on sim text |
 | [x]  2.B5 | `negotiate(deal)` loop (≤6 rounds). Recall `party:seller`, `playbook:*|segment` and the dealer max. **Tactic pick:** brain ON uses the best win rate with ε=0.15 in training and 0 in eval; brain OFF uses the default `anchor_low`. The SMART model writes the offer and message given the tactic, comps and memory. **Clamp the offer to `max_buy` in code.** Add the AI-disclosure line. Write a party note (summary, signals), a playbook counter (tries/wins) and a party fact (the seller's last counter, which becomes the anchor for repeat sellers). | same | Closes a `motivated_private` sim seller under max |
 | [~]  2.B6 | `open_link(url)` tool. If seller text contains a URL, the negotiator "verifies" it with an `httpx` GET. On a proxy denial or connection error inside the sandbox, emit a `blocked` event ("Blocked by OpenShell policy") and write a `party` red-flag fact (confidence 0.9). Drop the deal. | same | Scammer persona produces a `blocked` event and a red flag  _Partial: red flag on link; no open_link/OpenShell yet_ |
-| [ ]  2.B7 | `request_approval(deal)`: state becomes `awaiting_approval` and emits an `approval` event. Optionally sends Telegram `sendMessage` with "Approve {car} at ${price}? Est. margin {m}%. Reply YES {deal_id}". | same | Deal waits; nothing advances without approval |
+| [ ]  2.B7 | `request_approval(deal)`: state becomes `awaiting_approval` and emits an `approval` event. The dashboard shows Approve / Reject (no Telegram). Optionally sends Telegram `sendMessage` with "Approve {car} at ${price}? Est. margin {m}%. Reply YES {deal_id}". | same | Deal waits; nothing advances without approval |
 | [ ]  2.B8 | `logistics(deal)`: You.com search for "car transport cost {from} to {to}", extract a range, simulate booking. A simulated clock (`1 day = 3 s`) emits `in_transit`, then `delivered`. Writes a `market` shipping observation. | same | Timeline events appear |
 | [ ]  2.B9 | `merchandise(deal)`: recall "what sells" counters and comps. Price = comps mid × (1 + markup). SMART writes title, description and 5 bullet points. Publishes to `GET /storefront` (HTML). | same | Storefront page shows the car |
 | [ ]  2.B10 | `close_sale(deal)`: sim buyer negotiation, mirroring 2.B5 on the sell side, with a floor of cost × (1 + min margin). Writes buyer notes and sell playbook counters. | same | Deal reaches `sold` with a margin |
@@ -191,7 +191,7 @@ Not connected yet (critical path):
 | [ ]  2.A1 | **Plan A:** run the dealer backend **inside** the sandbox. Options to try in order: (a) the onboard image flags (`--from` / `--from-image`) with a Dockerfile that adds Python and our backend; (b) install Python in the running sandbox and copy `backend/` in. Point `CRUSOE_BASE_URL` at the OpenShell-managed `inference.local` route so no Crusoe key is in the sandbox. | `nemoclaw/Dockerfile` (if used) | `curl /health` from the concierge returns `sandboxed: true` |
 | [ ]  2.A2 | **T+2:00 decision. Write it in team chat.** Plan A works: keep it. Otherwise **Plan B:** backend on the host, and only the concierge is sandboxed. Allow the backend host in the policy. The scam link is then opened **by the concierge** ("check this link the seller sent"), which still gives a real OpenShell block. | team chat | Decision recorded |
 | [ ]  2.A3 | Concierge skill: `nemoclaw/skills/dealer/SKILL.md` describing our API with curl examples (start shift, briefing, list deals, approve `D-xxx`, show brain highlights). Install it into the sandbox the way the docs describe. | `nemoclaw/skills/dealer/SKILL.md` | On Telegram, "start a shift for Tacomas" triggers `POST /shift/start` |
-| [ ]  2.A4 | Approval round trip. "YES D-102" on Telegram makes the concierge call `POST /deals/D-102/approve`. The concierge also writes the owner's free-text reasons ("too many owners") to `PUT /dealer` notes, which feeds preference learning. | skill | The deal advances from the phone |
+| [cut]  2.A4 | **Cut: dashboard Approve/Reject replaces it.** Approval round trip. "YES D-102" on Telegram makes the concierge call `POST /deals/D-102/approve`. The concierge also writes the owner's free-text reasons ("too many owners") to `PUT /dealer` notes, which feeds preference learning. | skill | The deal advances from the phone |
 
 **Plan B-lite (only if NemoClaw never comes up):** show `nemoclaw/dealer-policy.yaml` on screen, play a pre-recorded clip of the block from any working machine, and say so honestly. All dashboard features still work.
 
@@ -225,7 +225,7 @@ Not connected yet (critical path):
 | Done | # | Step | Done when |
 |---|---|---|---|
 | [ ]  3.A1 | Scam rehearsal: start a shift with a seeded `scammer` seller. Confirm (a) the OpenShell operator view shows the blocked domain, (b) the dashboard shows a red `blocked` row, (c) the Brain tab shows the red flag. The domain is under a reserved test TLD (for example `secure-escrow-verify.example.net`), so nothing real is contacted. | Works 3 times in a row |
-| [ ]  3.A2 | Phone approval rehearsal: approval message arrives on Telegram, "YES D-xxx" advances the deal, and the dashboard updates. | Works 3 times in a row |
+| [cut]  3.A2 | **Cut: rehearse dashboard approval instead.** Phone approval rehearsal: approval message arrives on Telegram, "YES D-xxx" advances the deal, and the dashboard updates. | Works 3 times in a row |
 | [ ]  3.A3 | Morning briefing: the concierge answers "what happened overnight?" using `GET /briefing`. | Reads well out loud |
 | [ ]  3.A4 | Terminal "beauty shot" for the pitch: `nemoclaw list` + `nemoclaw dealer policy list` + the operator view, in one tidy terminal layout. | Screenshot saved |
 | [ ]  3.A5 | **Stretch (only if all above is solid):** Nano Omni photo check in `appraise` (send listing photo URLs, get condition flags), **or** a local Nemotron route for private dealer data. Pick one and timebox to 30 minutes. | Visible in the deal drawer, or cut |
@@ -271,7 +271,7 @@ From here on: bug fixes, demo mode, copy, rehearsal. No new features. Anything u
 | [ ]  5.3 | C | Demo script dry run #1 against §10 of `docs/project-idea.md`, timed. Note every stumble. | Under 3:00 |
 | [ ]  5.4 | All | Fix the stumbles from 5.3 only. | — |
 | [ ]  5.5 | C | Dry run #2, **recorded** (screen + phone) as the backup video. | Video file saved locally and on a USB stick |
-| [ ]  5.6 | A | Pre-flight checklist: sandbox running, policy applied, Telegram bot online, operator view open in its own terminal, phone charged and unlocked, notifications on. | Checklist ticked |
+| [ ]  5.6 | A | Pre-flight checklist: sandbox running, policy applied, operator view open in its own terminal, phone charged and unlocked, notifications on. | Checklist ticked |
 | [ ]  5.7 | B | Reset script: `cd backend && python reset_demo.py` wipes deals and events and loads the `cold` snapshot. | One command resets the stage |
 
 ---

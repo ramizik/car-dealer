@@ -2,7 +2,6 @@
 # Allows only the APIs the dealer agents need. Everything else stays blocked and
 # shows up in `openshell term` for operator review (that is the scam-link demo).
 # Inference does not need an entry: the sandbox reaches Crusoe through inference.local.
-# Telegram egress comes from the maintained channel setup, not from this file.
 #
 # Apply:   nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-apis.yaml --dry-run
 #          nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-apis.yaml --yes
