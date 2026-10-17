@@ -1,6 +1,6 @@
 # Dealer: 6-hour build roadmap (Shared Brain track)
 
-Companion to `project-idea.md`. Times are hackathon clock, **T+0:00 to T+6:00**.
+Companion to `docs/project-idea.md`. Crusoe endpoint, model IDs and rate limits: `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md` (source of truth). Times are hackathon clock, **T+0:00 to T+6:00**.
 Every step has an owner lane, the file it touches, and a **done when** check. If a step's timebox runs out, take its fallback and move on.
 
 ---
@@ -53,9 +53,9 @@ Fewer people:
 
 | # | Lane | Step | Done when |
 |---|---|---|---|
-| 0.1 | All | Read `project-idea.md` §1, §6, §10 together (5 min). Agree on demo persona "Joe's Auto, Stockton CA". | Everyone can say the 3-minute demo out loud |
+| 0.1 | All | Read `docs/project-idea.md` §1, §6, §10 together (5 min). Agree on demo persona "Joe's Auto, Stockton CA". | Everyone can say the 3-minute demo out loud |
 | 0.2 | A | **Start the NemoClaw install now. It's the longest pole.** Pick the host: a Linux machine, or Windows 11 + WSL2 Ubuntu + Docker. Install OpenShell, then NemoClaw, following the official quickstart. Run `nemoclaw host probe`. | `nemoclaw --version` prints, and the probe reports the host is ready or lists specific gaps |
-| 0.3 | B | Copy `.env.example` to `.env`. Add `CRUSOE_API_KEY`. Call `GET {CRUSOE_BASE_URL}/models`, then write down the **exact** Nemotron IDs available: Ultra, Super, Nano / Nano Omni. Time one chat call per model. | IDs and latency written in team chat. `.env.example` gets `CRUSOE_MODEL_SMART=` and `CRUSOE_MODEL_FAST=`. |
+| 0.3 | B | Read the Crusoe skill (§6 rate limits, §12 troubleshooting). Fix `.env.example`: `CRUSOE_BASE_URL=https://api.inference.crusoecloud.com/v1`, because the old `api.crusoe.ai` host causes 429s. Copy it to `.env` and add `CRUSOE_API_KEY`. Run `GET /v1/models` and record the **exact** IDs plus `features` (tool_calling, structured_outputs) for Super, Lightning, Nano, Nano Omni, and Ultra if listed. Time one chat call per model. **Add a payment method to the Crusoe project if possible: 30 RPM per model without one, 600 with one.** | IDs, latency and RPM tier written in team chat. `.env.example` gets `CRUSOE_MODEL_SMART=` (Super), `CRUSOE_MODEL_FAST=` (Nano), `CRUSOE_MODEL_SIM=` (Lightning). |
 | 0.4 | D | Get the You.com key. `curl` all three endpoints with header `X-API-Key`: `POST https://ydc-index.io/v1/search`, `POST https://ydc-index.io/v1/contents`, `POST https://api.you.com/v1/research` (`research_effort: "lite"`). Time Research. | All three return 200. Research latency noted. Rename the env var to `YDC_API_KEY` or keep `YOU_API_KEY`, and pick one consistently. |
 | 0.5 | C | `npm install`, run the frontend, and confirm the current boilerplate renders against the backend in mock mode. | Page loads at :3000 with no console errors |
 | 0.6 | B | Update `CLAUDE.md` context: the track is now **Shared Brain only**, and the layout section matches the files in this roadmap. | CLAUDE.md committed |
@@ -65,7 +65,7 @@ Fewer people:
 ```json
 {"id": 42, "ts": 1760700000.1, "deal_id": "D-102", "agent": "negotiator",
  "type": "message|recall|write|state|blocked|approval|error",
- "text": "Offered $17,400 citing 3 comps", "data": {}, "model": "nemotron-3-ultra"}
+ "text": "Offered $17,400 citing 3 comps", "data": {}, "model": "nemotron-3-super"}
 ```
 
 **Deal states:** `sourced → appraised → negotiating → awaiting_approval → bought → in_transit → delivered → listed → sold`, plus `dropped` (with a reason).
@@ -85,7 +85,8 @@ Fewer people:
 | 1.B5 | `recall(scopes, keys, tags=None, budget_chars=1500) -> list[str]`. Rank by exact key match, then confidence, then recency, and stop at the budget. Each recall emits a `recall` event (for the UI chips). | same | Returns readable one-line strings, for example `"playbook: fast_cash_pickup @ motivated_private wins 7/9"` |
 | 1.B6 | `ENABLED` flag (brain OFF: `recall` returns `[]` and `write` is a no-op), plus `snapshot(name)` and `load(name)` into `data/brain/snapshots/`. | same | Toggling works, and snapshots round-trip |
 | 1.B7 | `stats()`: event count, bytes, per-scope counts, conflicts. This feeds the "lean" meter. | same | `GET /brain` can return it |
-| 1.B8 | `llm.py`: add a `tier="smart"\|"fast"` argument mapped to `CRUSOE_MODEL_SMART` / `CRUSOE_MODEL_FAST`. Add `CRUSOE_BASE_URL` override (for OpenShell's `inference.local` in Plan A). Add one retry on bad JSON. Record per-call latency and model for the footer. Keep mock mode, and add mock answers for the new prompts. | `backend/llm.py` | Mock and real both work. `chat_json` never raises to the caller. |
+| 1.B8 | `llm.py`: add a `tier="smart"\|"fast"\|"sim"` argument mapped to `CRUSOE_MODEL_SMART` / `CRUSOE_MODEL_FAST` / `CRUSOE_MODEL_SIM`. Add a `CRUSOE_BASE_URL` override (for OpenShell's `inference.local` in Plan A). Add one retry on bad JSON. Record per-call latency and model for the footer. Keep mock mode, and add mock answers for the new prompts. | `backend/llm.py` | Mock and real both work. `chat_json` never raises to the caller. |
+| 1.B9 | `llm.py` rate-limit and reasoning safety (see Crusoe skill §6, §7.2, §12): a **per-model** `asyncio.Semaphore` sized to the RPM tier; throttle on the `x-ratelimit-remaining-requests` header; jittered exponential backoff on 429/503 (max 4 tries); `max_tokens` ≥ 1024 on reasoning calls; `chat_template_kwargs: {"enable_thinking": false}` on fast extraction calls; if `content` is empty, check `finish_reason == "length"` and read `reasoning_content` defensively. | `backend/llm.py` | A burst of 40 parallel calls finishes with no unhandled 429 |
 
 **Brain record examples (for fixtures):**
 ```json
@@ -225,7 +226,7 @@ Fewer people:
 
 | # | Step | File | Done when |
 |---|---|---|---|
-| 4.1 | `eval.py`: `run(brain_enabled, scenarios)` drives `negotiate()` (and optionally scout→owner approval) with `SIM_FAST=1`. `asyncio.Semaphore(8)` for parallel calls. Same seeds in both conditions. | `backend/eval.py` | One condition finishes in under 3 minutes |
+| 4.1 | `eval.py`: `run(brain_enabled, scenarios)` drives `negotiate()` (and optionally scout→owner approval) with `SIM_FAST=1`. Parallelism comes from the per-model limiter in `llm.py` (1.B9). Same seeds in both conditions. **Call budget:** about 160 SMART calls (20 train + 2×10 held-out, ~4 rounds each). That takes ~6 min at 30 RPM and under 1 min at 600 RPM, so start the run early, or use a payment-method project. | `backend/eval.py` | Full protocol finishes in under 8 minutes |
 | 4.2 | Protocol: (1) wipe the brain, (2) **train** on 20 scenarios with brain ON, ε=0.15, (3) snapshot `warm`, (4) **held-out** 10 with brain OFF, (5) **held-out** 10 with brain ON loaded from `warm`, ε=0. | same | `data/eval_results.json` written |
 | 4.3 | Metrics per condition: **surplus captured** `mean((ask-paid)/(ask-floor))` over closed deals, **close rate**, **mean rounds**, **owner approval rate** (if scout eval is on), and a **scam deals avoided** count. | same | JSON has OFF and ON for every metric |
 | 4.4 | Run it. Read 3 transcripts per condition to make sure the gain comes from recall (tactic pick, repeat-seller anchor, learned preferences) and not from a bug. | — | Team agrees the number is honest |
@@ -248,7 +249,7 @@ From here on: bug fixes, demo mode, copy, rehearsal. No new features. Anything u
 |---|---|---|---|
 | 5.1 | B | `DEMO_MODE=1`: You.com from cache only, brain loads `cold` at shift start (so learning is visible) or `warm` for the Eval story, sim seeds fixed, simulated clock fast. | Full demo runs with Wi-Fi off (except Crusoe) |
 | 5.2 | B | Crusoe outage fallback: if 2 consecutive LLM calls fail, switch to mock answers for the negotiation text and keep the deterministic prices. A banner reads "degraded". | Unplug test: no crash |
-| 5.3 | C | Demo script dry run #1 against §10 of `project-idea.md`, timed. Note every stumble. | Under 3:00 |
+| 5.3 | C | Demo script dry run #1 against §10 of `docs/project-idea.md`, timed. Note every stumble. | Under 3:00 |
 | 5.4 | All | Fix the stumbles from 5.3 only. | — |
 | 5.5 | C | Dry run #2, **recorded** (screen + phone) as the backup video. | Video file saved locally and on a USB stick |
 | 5.6 | A | Pre-flight checklist: sandbox running, policy applied, Telegram bot online, operator view open in its own terminal, phone charged and unlocked, notifications on. | Checklist ticked |

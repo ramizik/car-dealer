@@ -77,11 +77,11 @@ All agents are plain async Python functions in one backend. "Swarm" means severa
 | **Concierge** | Owner-facing assistant. Takes goals, sends briefings, relays approvals. | Dealer profile, open deals | Owner preferences said in chat, approve/reject decisions | Nemotron (via NemoClaw / OpenClaw runtime) | NemoClaw messaging channel (Telegram) |
 | **Scout** | Finds candidate cars on marketplaces, auctions and public listings. | Dealer profile (makes, price band, mileage cap, region), past rejections | Listing seen, source quality (which sites gave approvable cars) | Nemotron Nano (extraction) | **You.com Search API**, **You.com Contents API** |
 | **Appraiser** | Values the car with cited comps, flags known issues, scores the deal. | Market comps for this segment, days-to-sell stats | Price observations with source URLs, known-issue notes | Nemotron Super/Ultra (reasoning). Nano Omni for photos (stretch) | **You.com Research API** |
-| **Negotiator** | Talks to the seller and gets the lowest price at or under the dealer's max. | Counterparty memory (this seller and similar sellers), playbook stats, dealer max | Conversation summary, seller signals, tactic used and its outcome | Nemotron Ultra (or Super) | Simulated seller channel |
+| **Negotiator** | Talks to the seller and gets the lowest price at or under the dealer's max. | Counterparty memory (this seller and similar sellers), playbook stats, dealer max | Conversation summary, seller signals, tactic used and its outcome | Nemotron 3 Super (Ultra if enabled for our project) | Simulated seller channel |
 | **Logistics** | Buys after approval (simulated escrow), books transport, tracks delivery. | Shipping cost observations per route, carrier notes | Quote and actual cost, delays | Nemotron Nano | **You.com Search** for carrier rates |
 | **Merchandiser** | Writes the listing, sets the price, publishes it to the dealer's own channels. | "What sells" stats, comps, dealer margin target | Listing variant, list price | Nemotron Super | Dealer storefront page plus Telegram channel post (stretch) |
 | **Closer** | Handles buyer inquiries and negotiates the sale upward. | Buyer memory, playbook stats (sell side), floor price | Buyer signals, tactic outcome, final sale | Nemotron Super | Simulated buyer channel |
-| **Librarian** | Compacts the brain, resolves or flags conflicts, distils lessons. | Whole event log | Compacted views, conflict flags, lessons | Nemotron Nano | None |
+| **Librarian** | Compacts the brain, resolves or flags conflicts, distils lessons. | Whole event log | Compacted views, conflict flags, lessons | Nemotron 3.5 Lightning (built for long-running sub-agents, 1M context) | None |
 
 **Hard rules enforced in code, not by prompts:**
 - An offer is never above `dealer.max_buy` for that car. It is clamped before sending.
@@ -148,8 +148,8 @@ The UI shows **"Recalled:"** chips under every agent action, so the audience can
 |---|---|---|
 | **NVIDIA NemoClaw** | Installs and runs the dealer's always-on agent on the dealer's own machine (`nemoclaw onboard`). An OpenClaw concierge agent lives in the sandbox and talks to the owner through a messaging channel. | Terminal: `nemoclaw list` shows the `dealer` sandbox running. Phone: Telegram message *"Approve 2019 Tacoma at $17,900? Est. margin 17%. Reply YES D-102."* |
 | **NVIDIA OpenShell** | Sandbox with a YAML network policy. Egress is allowed only to Crusoe inference, You.com and the dealer storefront. Everything else is blocked and surfaces for operator approval. Inference credentials stay in the OpenShell gateway, outside the sandbox. | **Scam moment:** a simulated seller sends a "verify payment" link to an unknown domain. The agent tries to open it, OpenShell blocks it, and the request shows up for operator review. The brain writes a red flag on that seller. |
-| **NVIDIA Nemotron** (Nemotron 3 family) | Ultra or Super for negotiation and appraisal reasoning. Nano for extraction, simulated personas and the librarian. Nano Omni for listing-photo condition checks (stretch). Optional local Nemotron for private dealer data (stretch). | A model badge on each agent action shows which Nemotron handled it. |
-| **Crusoe Managed Inference** | Hosts every Nemotron call through an OpenAI-compatible API (`backend/llm.py`). | Latency and token counter in the footer. A burst of parallel negotiations shows throughput. |
+| **NVIDIA Nemotron** (Nemotron 3 / 3.5 family) | **Super 120B** for negotiation and appraisal reasoning (Ultra 550B if `/v1/models` shows it for our project). **3.5 Lightning** for the librarian and the simulated sellers and buyers. **Nano 30B** for extraction and classification. **Nano Omni** for listing-photo condition checks (image input confirmed; stretch). Optional local Nemotron for private dealer data (stretch). Roles are spread across models on purpose, because Crusoe rate limits are per model. | A model badge on each agent action shows which Nemotron handled it. |
+| **Crusoe Managed Inference** | Hosts every Nemotron call through an OpenAI-compatible API at `https://api.inference.crusoecloud.com/v1` (`backend/llm.py`). | Latency and token counter in the footer. A burst of parallel negotiations shows throughput. |
 | **You.com Search API** | Scout finds real, current listings (`POST ydc-index.io/v1/search`). | Live feed of real listings with their source sites. |
 | **You.com Contents API** | Pulls the full listing page as Markdown for structured extraction (`POST ydc-index.io/v1/contents`). | "Parsed listing" card: year, trim, miles, price, VIN if present. |
 | **You.com Research API** | Appraiser gets a cited valuation and common-issues report (`POST api.you.com/v1/research`). | Valuation card with clickable citations. These citations feed `market` brain records. |
@@ -267,6 +267,8 @@ We will present only the numbers we actually measure. If the gain is small, we s
 |---|---|---|
 | NemoClaw is alpha and Linux-first. Our laptops run Windows. | **High** | Start it first on a Linux box or WSL2 + Docker. Timebox: Plan A by T+2:00, else Plan B (concierge-only sandbox). Last resort: show the policy file plus a recorded block clip. |
 | Exact Crusoe model IDs differ from the docs | Medium | Check `GET /v1/models` at T+0. Model names live in `.env`, never hard-coded. |
+| Crusoe rate limits: **30 RPM per model** without a payment method (600 with one) | **High** for a swarm plus eval | Add a payment method at T+0 if possible. Spread roles across models (limits are per model). Client-side throttle on the `x-ratelimit-remaining-*` headers, with jittered backoff on 429/503. |
+| Reasoning models return empty `content` when `max_tokens` is too small | Medium | `max_tokens` ≥ 1024 on reasoning calls. `enable_thinking: false` on fast extraction calls. Check `finish_reason`. |
 | You.com Research latency (seconds to a minute) | Medium | `research_effort: "lite"` live, results cached to disk, demo mode replays the cache. |
 | Search returns few usable listings | Medium | Pre-run queries and cache them. Seed 5 real listings as a guaranteed fallback. |
 | Eval shows a small or noisy gain | Medium | Deterministic simulator, fixed seeds, more held-out scenarios. Report honestly. |
@@ -280,7 +282,7 @@ We will present only the numbers we actually measure. If the gain is small, we s
 1. NemoClaw installs on our host (`nemoclaw host probe`) and `nemoclaw onboard` accepts a **compatible OpenAI endpoint** (Crusoe base URL, key and Nemotron model).
 2. How to add our own network policy entries (`nemoclaw <name> policy list` / `policy add`) and where blocked requests surface for approval (`openshell term` or the dashboard).
 3. Whether code inside the sandbox can call OpenShell's managed inference route (`inference.local`) so our backend never holds a key.
-4. Exact Crusoe Nemotron model IDs: Ultra (`nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B`), Super (`nvidia/nemotron-3-super-120b-a12b`, current `.env`), Nano Omni (`nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B`). Also whether Nano Omni accepts images on Crusoe.
+4. Crusoe base URL is `https://api.inference.crusoecloud.com/v1`. The current `.env.example` still has the old `api.crusoe.ai` host, which the team skill says to avoid. Confirm exact Nemotron IDs with `GET /v1/models`: Super `nvidia/Nemotron-3-Super-120B-A12B`, Lightning `nvidia/nemotron-3.5-lightning-30b-a3b`, Nano `nvidia/Nemotron-3-Nano-30B-A3B`, Nano Omni `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B`, and Ultra (`nvidia/NVIDIA-Nemotron-3-Ultra-550B`, possibly not enabled for us). Source of truth: `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md`.
 5. You.com key works on all three endpoints (`X-API-Key` header) and the account has credits.
 6. Which messaging channel NemoClaw supports most reliably for our agent (target: Telegram).
 
@@ -288,6 +290,8 @@ We will present only the numbers we actually measure. If the gain is small, we s
 
 ## 15. References
 
+- Team Crusoe skill (endpoint, model IDs, rate limits, reasoning toggles): `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md`
+- Build roadmap: `agents/plans/roadmap.md`
 - NemoClaw overview (OpenClaw): https://docs.nvidia.com/nemoclaw/user-guide/openclaw/about/overview.md
 - NemoClaw command reference: https://docs.nvidia.com/nemoclaw/user-guide/openclaw/reference/commands
 - Crusoe: Nemotron 3 Ultra on Crusoe Managed Inference: https://www.crusoe.ai/resources/blog/nvidia-nemotron-3-ultra-langchain-deep-agents-on-crusoe-managed-inference
