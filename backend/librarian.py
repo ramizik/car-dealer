@@ -32,17 +32,22 @@ def lessons() -> list[str]:
     return out
 
 
+def _reason_key(reason: str) -> str:
+    """Group failures by kind, not by price: 'profit $1,390 is under your $1,500 minimum' -> 'profit is under your minimum'."""
+    return re.sub(r"\s+", " ", re.sub(r"\$[\d,]+(\.\d+)?\s?", "", reason)).strip()
+
+
 def mistakes() -> list[str]:
     reasons = Counter()
     for entry in brain.view()["scopes"]["party"].values():
         for n in entry["notes"]:
             m = re.match(r"\[(FAILED|BLOCKED)\] .*?no deal: (.+?);", n["text"])  # artifact may start with the car
             if m:
-                reasons[m.group(2)] += 1
+                reasons[_reason_key(m.group(2))] += 1
     out = []
     for reason, n in reasons.items():
-        if n >= MIN_REPEATS:
-            out.append(skills.record_mistake("buyer/outreach", f"Repeated miss: {reason}"))  # same line bumps hits
+        if n >= MIN_REPEATS:  # hits = how many deals really failed this way, written only when it changes
+            out.append(skills.set_mistake("buyer/outreach", f"Repeated miss: {reason}", n))
     return [o for o in out if o]
 
 

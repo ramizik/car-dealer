@@ -58,6 +58,29 @@ def record_mistake(agent: str, line: str) -> str:
         return ""
 
 
+def set_mistake(agent: str, line: str, hits: int) -> str:
+    """Like record_mistake, but hits is the true count (the librarian recounts from the brain each run).
+    Only rewrites the file when the count changes, so repeated runs do not churn it."""
+    path = ROOT / agent / "MISTAKES.md"
+    try:
+        old = _read(path).splitlines()
+        header = [l for l in old if l.startswith("#")] or [f"# {agent} mistakes"]
+        items = [l for l in old if l.startswith("- ")]
+        for l in items:
+            if line in l:
+                m = re.search(r"\(hits: (\d+)\)", l)
+                if m and int(m.group(1)) == hits:
+                    return ""  # unchanged
+                items.remove(l)
+                break
+        entry = f"- {time.strftime('%Y-%m-%d')} {line} (hits: {hits})"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(header + [""] + [entry] + items) + "\n", encoding="utf-8")
+        return entry
+    except Exception:
+        return ""
+
+
 def catalog() -> list[dict]:
     """All agents with a SKILL.md, for the UI."""
     return [{"agent": p.parent.relative_to(ROOT).as_posix(), "mistakes": len(mistakes(p.parent.relative_to(ROOT).as_posix(), 999))}

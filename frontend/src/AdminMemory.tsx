@@ -11,6 +11,9 @@ type Data = {
   youcom: { calls: number; cache_hits: number; errors: number; demo_mode: boolean };
   agents: { working: number; total: number; shift_phase: string; demo_names: boolean;
             agents: { name: string; role: string; status: "working" | "idle"; last_seen_s: number | null; memory_writes: number }[] };
+  learned?: { lessons: string[]; mistakes: Record<string, string[]>;
+              last_tidy: { events_before: number; events_after: number; kb_before: number; kb_after: number } | null;
+              long_term: { memories: number; kb: number; embedders: string[] } };
 };
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -77,6 +80,36 @@ export default function AdminMemory() {
         </table>
         <p className="small muted">"Working" means the agent logged something in the last two minutes or the shift is in its phase. Agents only act while a shift runs.</p>
       </section>
+
+      {data.learned && (
+        <section className="stack-sm" aria-labelledby="learned-head">
+          <h2 id="learned-head">What the team learned</h2>
+          <div className="summary">
+            <div className="stat"><span className="value">{data.learned.lessons.length}</span><span className="label">Tactic lessons</span></div>
+            <div className="stat"><span className="value">{Object.values(data.learned.mistakes).reduce((s, m) => s + m.length, 0)}</span><span className="label">Mistakes to avoid</span></div>
+            <div className="stat"><span className="value">{data.learned.long_term.memories.toLocaleString()}</span><span className="label">Long-term memories (similar-deal search)</span></div>
+          </div>
+          {data.learned.lessons.length > 0 ? (
+            <ul className="facts">{data.learned.lessons.map((l) => <li key={l}>{l.replace(/^lesson: /, "")}</li>)}</ul>
+          ) : (
+            <p className="empty">No lessons yet. A tactic needs 3 tries with one seller type before it becomes a lesson.</p>
+          )}
+          {Object.entries(data.learned.mistakes).map(([agent, lines]) => (
+            <div key={agent}>
+              <h3 className="small muted">Mistakes: {agent}</h3>
+              <ul className="facts">
+                {lines.map((l) => <li key={l}>{l.replace(/^- \d{4}-\d{2}-\d{2} /, "")}</li>)}
+              </ul>
+            </div>
+          ))}
+          {data.learned.last_tidy && (
+            <p className="small muted">
+              Last tidy-up: {data.learned.last_tidy.events_before.toLocaleString()} to {data.learned.last_tidy.events_after.toLocaleString()} memory
+              entries ({data.learned.last_tidy.kb_before} KB to {data.learned.last_tidy.kb_after} KB). What agents recall is unchanged.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="stack-sm" aria-labelledby="cost-head">
         <h2 id="cost-head">Memory on vs off (held-out eval)</h2>

@@ -278,7 +278,21 @@ def admin_memory():
         "llm": llm.STATS,
         "youcom": youcom.STATS,
         "agents": swarm.roster(),
+        "learned": _learned(),
     }
+
+
+def _learned() -> dict:
+    """What the team has learned: librarian lessons, per-agent mistakes, last tidy-up, long-term vector memory."""
+    import skills
+    import vector_memory
+    play = brain.view()["scopes"]["playbook"]
+    lessons = [n["text"] for k, e in sorted(play.items()) if k.startswith("lesson|") for n in e["notes"][-1:]]
+    mistakes = {c["agent"]: skills.mistakes(c["agent"], 8) for c in skills.catalog() if c["mistakes"]}
+    tidy = next((e for e in reversed(swarm.EVENTS) if e["agent"] == "librarian" and "compaction" in e["data"]), None)
+    return {"lessons": lessons, "mistakes": mistakes,
+            "last_tidy": tidy and {"ts": tidy["ts"], **tidy["data"]["compaction"]},
+            "long_term": vector_memory.stats()}
 
 
 @app.get("/inventory")
