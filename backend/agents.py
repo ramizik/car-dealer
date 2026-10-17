@@ -12,6 +12,7 @@ import brain
 import conversations
 import dealer_memory
 import llm
+import outreach
 import seller_agent
 import skills
 import voice
@@ -183,17 +184,19 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         cap = min(cap, max_buy)
 
     offer = round(min(cap, ask * OPEN_PCT), -1)
+    channel = outreach.channel_for(segment, "seller", deal.get("channels"))
     transcript, counter, closed, price, dropped = [], None, False, None, ""
     for r in range(MAX_ROUNDS):
         msg = await _message(deal, tactic, offer, r, seller_text, memory, party, skill["text"])
         if r == 0:
             msg = f"{msg} {DISCLOSURE.format(dealer=dealer)}"
-        conversations.append(party, "agent", msg, tag=f"${offer:,.0f}, {tactic}")
-        entry = {"from": "agent", "text": msg, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []}
+        msg = outreach.shape(channel, msg, first=(r == 0))
+        conversations.append(party, "agent", msg, tag=f"${offer:,.0f}, {tactic}, {channel}")
+        entry = {"from": "agent", "text": msg, "channel": channel, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []}
         if voice_on and (audio := voice.speak(msg)):
             entry["audio_b64"] = base64.b64encode(audio).decode()
         transcript.append(entry)
-        emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic})
+        emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic, "channel": channel})
 
         reply = seller.respond(int(offer), tactic)
         accepted, counter, seller_text = await reply if inspect.isawaitable(reply) else reply
@@ -262,7 +265,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
                         f"({q['days_source']}), profit ~{seller_agent.usd(q['profit'])}", confidence=0.6, source=f"quote:{deal_id}")
 
     result = {"deal_id": deal_id, "closed": closed, "price": price, "rounds": sum(t["from"] == "agent" for t in transcript),
-              "tactic": tactic, "segment": segment, "ask": ask, "max_buy": max_buy, "dropped": dropped,
+              "tactic": tactic, "segment": segment, "channel": channel, "ask": ask, "max_buy": max_buy, "dropped": dropped,
               "transcript": transcript, "recalled": memory, "resale_quote": q}
     emit("negotiator", "state", f"{'Bought' if closed else 'Dropped'} {deal_id}" + (f" at ${price:,.0f}" if closed else f": {dropped}"),
          {"deal_id": deal_id, "closed": closed, "price": price})
