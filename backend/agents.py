@@ -3,6 +3,7 @@
 Prices are decided in code (deterministic, clamped to max_buy); the LLM only writes the words.
 """
 import base64
+import inspect
 import os
 import random
 import re
@@ -11,9 +12,9 @@ import brain
 import llm
 import voice
 
-# Canonical tactic names. sim.py personas pick their hidden `weak_to` from this list.
-TACTICS = ["anchor_low", "fast_cash_pickup", "cite_comps", "meet_halfway", "walk_away_threat"]
-DEFAULT_TACTIC = "anchor_low"
+# Tactic names are shared with sim.py (names only; the persona -> weak_to mapping stays hidden there).
+TACTICS = ["fast_cash_pickup", "comps_anchor", "split_difference", "volume_relationship", "walk_away_threat"]
+DEFAULT_TACTIC = "comps_anchor"  # brain OFF: classic lowball citing comps
 SEGMENTS = ["motivated_private", "price_anchored", "haggler", "wholesaler_repeat", "unknown"]
 MAX_ROUNDS = 6
 OPEN_PCT = 0.78  # same opening for every tactic, so measured gains come from the tactic, not the anchor
@@ -74,10 +75,10 @@ def pick_tactic(segment: str, epsilon: float = 0.0, rng=random) -> str:
 
 def _template(tactic, offer, round_, comps_mid=None):
     lines = {
-        "anchor_low": f"I can do ${offer:,.0f} today.",
         "fast_cash_pickup": f"I can pay ${offer:,.0f} cash and pick it up this week, no hassle.",
-        "cite_comps": f"Similar ones nearby are going for less; ${offer:,.0f} is fair" + (f" against a ${comps_mid:,.0f} market." if comps_mid else "."),
-        "meet_halfway": f"Let's meet in the middle: ${offer:,.0f}.",
+        "comps_anchor": f"Similar ones nearby are going for less; ${offer:,.0f} is fair" + (f" against a ${comps_mid:,.0f} market." if comps_mid else "."),
+        "split_difference": f"Let's meet in the middle: ${offer:,.0f}.",
+        "volume_relationship": f"${offer:,.0f} works for us, and we buy regularly, so there's more business after this one.",
         "walk_away_threat": f"${offer:,.0f} is where I am, otherwise I'll look at the other one I found.",
     }
     return lines.get(tactic, f"I can offer ${offer:,.0f}.") if round_ else f"Hi! Interested in your car. {lines.get(tactic)}"
@@ -108,7 +109,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     rng = rng or random.Random(hash(deal.get("id", "")))
     deal_id, party = deal.get("id", "D-?"), f"seller:{deal.get('seller_id', 'unknown')}"
     ask, max_buy = float(deal["ask"]), float(deal["max_buy"])
-    seller_text = deal.get("seller_text", "")
+    seller_text = deal.get("seller_text") or (seller.opening() if hasattr(seller, "opening") else "")
     dealer = deal.get("dealer", "Joe's Auto")
     voice_on = bool(deal.get("voice"))  # voice mode: speak agent lines, transcribe seller audio when given
     if voice_on and deal.get("seller_audio"):
@@ -127,11 +128,11 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     memory += pb
     emit("negotiator", "recall", f"segment={segment}, tactic={tactic}", {"deal_id": deal_id, "lines": pb})
 
-    # repeat seller: their last counter is a better ceiling than max_buy
+    # repeat seller: their last counter (as share of their ask) is a better ceiling than max_buy
     cap = max_buy
-    last = (known.get("facts", {}).get("last_counter") or {}).get("value")
+    last = (known.get("facts", {}).get("last_counter_pct") or {}).get("value")
     if isinstance(last, (int, float)):
-        cap = min(cap, float(last))
+        cap = min(cap, ask * float(last))
 
     offer = round(min(cap, ask * OPEN_PCT), -1)
     transcript, counter, closed, price, dropped = [], None, False, None, ""
@@ -145,7 +146,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         transcript.append(entry)
         emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic})
 
-        accepted, counter, seller_text = seller.respond(offer, tactic)
+        reply = seller.respond(int(offer), tactic)
+        accepted, counter, seller_text = await reply if inspect.isawaitable(reply) else reply
         transcript.append({"from": "seller", "text": seller_text, "counter": counter})
         emit("seller", "message", seller_text, {"deal_id": deal_id, "counter": counter})
 
@@ -165,9 +167,9 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             emit("negotiator", "callback", ack, {"deal_id": deal_id, "phone": masked})
         elif counter is not None and not asked_number and not accepted:
             asked_number = True
-            ask = "Happy to set up a call. What number should the desk ring you on?"
-            transcript.append({"from": "agent", "text": ask, "kind": "ask_number", "recalled": []})
-            emit("negotiator", "message", ask, {"deal_id": deal_id, "kind": "ask_number"})
+            question = "Happy to set up a call. What number should the desk ring you on?"
+            transcript.append({"from": "agent", "text": question, "kind": "ask_number", "recalled": []})
+            emit("negotiator", "message", question, {"deal_id": deal_id, "kind": "ask_number"})
         if r == 0 and segment == "unknown":
             segment = await classify_segment(seller_text)
         if accepted:
@@ -181,7 +183,9 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             transcript.append({"from": "agent", "text": f"Deal at ${counter:,.0f}.", "offer": counter, "tactic": tactic, "recalled": []})
             break
         target = min(counter, cap)
-        offer = round(target if r == MAX_ROUNDS - 2 else offer + (target - offer) * STEP, -1)
+        left = seller.public().get("patience_left", MAX_ROUNDS - r - 1) if hasattr(seller, "public") else MAX_ROUNDS - r - 1
+        last_chance = left <= 1 or r == MAX_ROUNDS - 2
+        offer = round(target if last_chance else offer + (target - offer) * STEP, -1)
         offer = min(offer, max_buy)  # hard clamp in code, never trust the model
     else:
         dropped = "no deal within round limit"
@@ -190,7 +194,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     brain.write("negotiator", "playbook", f"{tactic}|{segment}", "counter", {"tries": 1, "wins": int(closed), "saved": round((ask - price) / ask, 4) if closed else 0}, source=f"chat:{deal_id}")
     brain.write("negotiator", "party", party, "fact", segment, attr="segment", confidence=0.7, source=f"chat:{deal_id}")
     if counter is not None:
-        brain.write("negotiator", "party", party, "fact", float(counter), attr="last_counter", confidence=0.8, source=f"chat:{deal_id}")
+        final = price if closed else counter  # what they actually settled at, or their last number
+        brain.write("negotiator", "party", party, "fact", round(final / ask, 4), attr="last_counter_pct", confidence=0.8, source=f"chat:{deal_id}")
     hint = transcript[1]["text"][:120] if len(transcript) > 1 else ""
     brain.write("negotiator", "party", party, "note",
                 f"{segment}: {tactic} {'closed at $%s' % f'{price:,.0f}' if closed else 'failed (' + dropped + ')'}; said: {hint}",
