@@ -79,3 +79,5 @@ export type EvalResult = {
   metrics: EvalMetric[];
   rows: { scenario: string; segment: string; off: string; on: string }[];
 };
+
+export type OnboardingQuestion = { id: string; ask: string };

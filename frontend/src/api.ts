@@ -1,6 +1,6 @@
 // Every read falls back to fixtures, so a dead backend shows sample data, never a blank screen.
 import * as fx from "./fixtures";
-import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
+import type { AgentEvent, Brain, Deal, EvalResult, Health, OnboardingQuestion } from "./types";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -36,6 +36,7 @@ export const api = {
   events: () => get<AgentEvent[]>("/events?since=0", fx.events),
   brain: () => get<Brain>("/brain", fx.brain),
   eval: () => get<EvalResult>("/eval", fx.evalResult),
+  onboardingQuestions: () => get<OnboardingQuestion[]>("/onboarding/questions", []),
   startShift: () => post("/shift/start", { max_deals: 5 }),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean) => post(`/deals/${id}/approve`, { yes }),

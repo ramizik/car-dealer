@@ -9,6 +9,7 @@ from pydantic import BaseModel  # noqa: E402
 import brain  # noqa: E402
 import loop  # noqa: E402
 import memory  # noqa: E402
+from onboarding import QUESTIONS  # noqa: E402
 
 app = FastAPI(title="dealer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -31,6 +32,11 @@ async def run(req: RunReq):
 @app.get("/memory")
 def get_memory():
     return memory.load()
+
+
+@app.get("/onboarding/questions")
+def onboarding_questions():
+    return QUESTIONS
 
 
 @app.get("/brain")

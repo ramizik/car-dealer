@@ -4,15 +4,17 @@ import * as fx from "./fixtures";
 import BrainView from "./BrainView";
 import DealPanel from "./DealPanel";
 import EvalView from "./EvalView";
+import OnboardingView from "./OnboardingView";
 import ShiftView from "./ShiftView";
 import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
 
-type Tab = "shift" | "brain" | "eval";
+type Tab = "shift" | "brain" | "eval" | "dealer";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "shift", label: "Shift" },
   { id: "brain", label: "Brain" },
   { id: "eval", label: "Results" },
+  { id: "dealer", label: "Dealer setup" },
 ];
 
 export default function App() {
@@ -97,6 +99,7 @@ export default function App() {
         {tab === "shift" && <ShiftView deals={deals} events={events} onOpen={setOpenId} onDecide={decide} />}
         {tab === "brain" && <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />}
         {tab === "eval" && <EvalView result={evalResult} onRun={() => api.runEval().then(refresh)} />}
+        {tab === "dealer" && <OnboardingView />}
       </div>
 
       <footer className="muted small">Nemotron on Crusoe · Search by You.com</footer>
