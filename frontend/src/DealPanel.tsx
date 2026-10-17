@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { STAGES, money, profit, time } from "./format";
 import type { AgentEvent, Deal } from "./types";
+import { CHANNEL_LABELS } from "./channels";
 
 type Props = {
   deal: Deal;
@@ -84,6 +85,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
                 <div key={i} className={`bubble ${t.from === "agent" ? "ours" : ""}`}>
                   <span className="who">
                     {t.from === "agent" ? "You (via us)" : t.from === "buyer" ? "Buyer" : "Seller"}
+                    {t.channel && <span className="tag channel">{CHANNEL_LABELS[t.channel] ?? t.channel}</span>}
                   </span>
                   <p>{t.text}</p>
                   {t.recalled && t.recalled.length > 0 && (
@@ -107,6 +109,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
             {history.map((e) => (
               <li key={e.id} className={e.type === "blocked" ? "blocked" : ""}>
                 <span className="who">{time(e.ts)}</span>
+                {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
                 {e.text}
               </li>
             ))}

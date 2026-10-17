@@ -12,7 +12,7 @@ export type DealState =
   | "sold"
   | "dropped";
 
-export type EventType = "message" | "recall" | "write" | "state" | "blocked" | "approval" | "error";
+export type EventType = "message" | "recall" | "write" | "state" | "outreach" | "blocked" | "approval" | "error";
 
 export type AgentEvent = {
   id: number;
@@ -32,6 +32,7 @@ export type ChatTurn = {
   text: string;
   recalled?: string[];
   tactic?: string;
+  channel?: string;
 };
 
 export type Deal = {

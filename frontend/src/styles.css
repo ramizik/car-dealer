@@ -313,3 +313,5 @@ tbody tr:last-child td { border-bottom: none; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+.tag.channel { background: var(--surface-2, #eef0f3); color: var(--ink-2, #444); margin-left: 6px; font-weight: 600; padding: 1px 8px; }

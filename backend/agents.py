@@ -264,9 +264,15 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
                         f"bought ${price:,.0f}; resale ~${q['resale_price']:,.0f}, ~{q['days_to_sell']:.0f} days "
                         f"({q['days_source']}), profit ~{seller_agent.usd(q['profit'])}", confidence=0.6, source=f"quote:{deal_id}")
 
+    sell_pitches = []
+    if closed:  # selling agent starts reaching buyers right away, each on their own channel
+        resale = (q or {}).get("resale_price") or price
+        buyers = deal.get("buyers") or [{"id": f"{deal_id}-{p[:3]}", "persona": p} for p in ("motivated_private", "wholesaler_repeat", "haggler")]
+        sell_pitches = outreach.sell_outreach({**deal, "id": deal_id}, buyers, resale, emit, deal.get("channels"))
+
     result = {"deal_id": deal_id, "closed": closed, "price": price, "rounds": sum(t["from"] == "agent" for t in transcript),
               "tactic": tactic, "segment": segment, "channel": channel, "ask": ask, "max_buy": max_buy, "dropped": dropped,
-              "transcript": transcript, "recalled": memory, "resale_quote": q}
+              "transcript": transcript, "recalled": memory, "resale_quote": q, "sell_outreach": sell_pitches}
     emit("negotiator", "state", f"{'Bought' if closed else 'Dropped'} {deal_id}" + (f" at ${price:,.0f}" if closed else f": {dropped}"),
          {"deal_id": deal_id, "closed": closed, "price": price})
     return result

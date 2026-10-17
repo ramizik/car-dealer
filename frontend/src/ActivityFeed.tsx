@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { time } from "./format";
 import type { AgentEvent } from "./types";
+import { CHANNEL_LABELS } from "./channels";
 
 type Props = { events: AgentEvent[]; onOpen: (dealId: string) => void; limit?: number };
 
@@ -30,6 +31,7 @@ export default function ActivityFeed({ events, onOpen, limit }: Props) {
             <span className="who">
               {time(e.ts)}
               {e.type === "blocked" && " · Blocked"}
+              {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
             </span>
             {e.deal_id ? (
               <button className="feed-link" onClick={() => onOpen(e.deal_id!)}>{e.text}</button>
