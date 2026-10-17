@@ -1,0 +1,40 @@
+import type { Deal, DealState } from "./types";
+
+export const money = (n?: number) => (n === undefined ? "—" : `$${Math.round(n).toLocaleString("en-US")}`);
+
+export const time = (ts: number) =>
+  new Date(ts * 1000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+// Plain-language names for each pipeline state, in order.
+export const STAGES: { state: DealState; label: string }[] = [
+  { state: "sourced", label: "Found" },
+  { state: "appraised", label: "Valued" },
+  { state: "negotiating", label: "Negotiating" },
+  { state: "awaiting_approval", label: "Needs your OK" },
+  { state: "bought", label: "Bought" },
+  { state: "in_transit", label: "Shipping" },
+  { state: "delivered", label: "On the lot" },
+  { state: "listed", label: "For sale" },
+  { state: "sold", label: "Sold" },
+];
+
+export const stageLabel = (s: DealState) => (s === "dropped" ? "Stopped" : STAGES.find((x) => x.state === s)!.label);
+
+// The board groups the 9 states into the 4 questions a dealer asks.
+export const COLUMNS: { title: string; hint: string; states: DealState[] }[] = [
+  { title: "Buying", hint: "Agents are finding, valuing and negotiating", states: ["sourced", "appraised", "negotiating", "awaiting_approval"] },
+  { title: "Coming in", hint: "Paid for, on the way to you", states: ["bought", "in_transit", "delivered"] },
+  { title: "For sale", hint: "Listed on your storefront", states: ["listed"] },
+  { title: "Sold", hint: "Closed deals", states: ["sold"] },
+];
+
+export const profit = (d: Deal) => (d.sold_for !== undefined && d.bought_for !== undefined ? d.sold_for - d.bought_for : undefined);
+
+// The single number that matters most at each stage.
+export function keyNumber(d: Deal): string {
+  if (d.state === "sold") return `Sold ${money(d.sold_for)} · +${money(profit(d))}`;
+  if (d.state === "listed") return `Listed ${money(d.list_price)} · paid ${money(d.bought_for)}`;
+  if (d.bought_for !== undefined) return `Paid ${money(d.bought_for)}`;
+  if (d.offer !== undefined) return `Offer ${money(d.offer)} · asks ${money(d.asking)}`;
+  return `Asks ${money(d.asking)}`;
+}

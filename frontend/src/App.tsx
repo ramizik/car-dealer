@@ -1,78 +1,107 @@
 import { useEffect, useState } from "react";
+import { api } from "./api";
+import * as fx from "./fixtures";
+import BrainView from "./BrainView";
+import DealPanel from "./DealPanel";
+import EvalView from "./EvalView";
+import ShiftView from "./ShiftView";
+import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+type Tab = "shift" | "brain" | "eval";
 
-type Check = { check: string; pass: boolean; reason: string };
-type Step = { iter: number; output: string; results: Check[]; decision: string };
-type Result = { goal: string; status: string; checks: string[]; output: string; trace: Step[] };
+const TABS: { id: Tab; label: string }[] = [
+  { id: "shift", label: "Shift" },
+  { id: "brain", label: "Brain" },
+  { id: "eval", label: "Results" },
+];
 
 export default function App() {
-  const [goal, setGoal] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Result | null>(null);
-  const [lessons, setLessons] = useState<string[]>([]);
-  const [error, setError] = useState("");
+  const [tab, setTab] = useState<Tab>("shift");
+  const [health, setHealth] = useState<Health>(fx.health);
+  const [deals, setDeals] = useState<Deal[]>(fx.deals);
+  const [events, setEvents] = useState<AgentEvent[]>(fx.events);
+  const [brain, setBrain] = useState<Brain>(fx.brain);
+  const [evalResult, setEvalResult] = useState<EvalResult>(fx.evalResult);
+  const [offline, setOffline] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  const refreshMemory = () =>
-    fetch(`${API}/memory`).then((r) => r.json()).then((m) => setLessons(m.lessons)).catch(() => {});
-
-  useEffect(() => { refreshMemory(); }, []);
-
-  const go = async () => {
-    setLoading(true); setError(""); setResult(null);
-    try {
-      const r = await fetch(`${API}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setResult(await r.json());
-      refreshMemory();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
+  const refresh = async () => {
+    const [h, d, e, b, r] = await Promise.all([api.health(), api.deals(), api.events(), api.brain(), api.eval()]);
+    // Only replace what the backend actually served; anything missing keeps current (sample) data.
+    setOffline(h.offline || d.offline);
+    if (!h.offline) setHealth(h.data);
+    if (!d.offline) setDeals(d.data);
+    if (!e.offline) setEvents(e.data);
+    if (!b.offline) setBrain(b.data);
+    if (!r.offline) setEvalResult(r.data);
   };
 
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 2000);
+    return () => clearInterval(t);
+  }, []);
+
+  const decide = async (id: string, yes: boolean) => {
+    const ok = await api.approve(id, yes);
+    if (!ok) {
+      setDeals((ds) =>
+        ds.map((d) =>
+          d.id === id
+            ? yes
+              ? { ...d, state: "bought", bought_for: d.offer }
+              : { ...d, state: "dropped", drop_reason: "Declined by you" }
+            : d,
+        ),
+      );
+    }
+    refresh();
+  };
+
+  const toggleShift = async () => {
+    const running = health.shift_running;
+    await (running ? api.stopShift() : api.startShift());
+    setHealth((h) => ({ ...h, shift_running: !running }));
+  };
+
+  const open = deals.find((d) => d.id === openId);
+
   return (
-    <div style={{ fontFamily: "system-ui", maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
-      <h1>dealer</h1>
-      <p>One-line goal in. Agent team defines done, works, verifies, loops.</p>
-      <input
-        style={{ width: "75%", padding: 8 }}
-        value={goal}
-        onChange={(e) => setGoal(e.target.value)}
-        placeholder="Goal..."
-      />
-      <button onClick={go} disabled={loading || !goal} style={{ padding: 8, marginLeft: 8 }}>
-        {loading ? "Running..." : "Run"}
-      </button>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-
-      {result && (
-        <>
-          <h2>Status: {result.status}</h2>
-          <h3>Definition of done</h3>
-          <ul>{result.checks.map((c, i) => <li key={i}>{c}</li>)}</ul>
-          <h3>Trace</h3>
-          {result.trace.map((s) => (
-            <details key={s.iter} open={s.iter === result.trace.length}>
-              <summary>Iter {s.iter} - {s.decision}</summary>
-              <pre style={{ whiteSpace: "pre-wrap" }}>{s.output}</pre>
-              <ul>
-                {s.results.map((r, i) => (
-                  <li key={i}>{r.pass ? "PASS" : "FAIL"} - {r.check}: {r.reason}</li>
-                ))}
-              </ul>
-            </details>
+    <div className="app">
+      <header className="top">
+        <div className="brand">
+          <strong>{health.dealer_name ?? "Your dealership"}</strong>
+          <span className="muted">
+            {health.shift_running ? "● Agents working" : "○ Agents idle"}
+          </span>
+        </div>
+        <nav>
+          {TABS.map((t) => (
+            <button key={t.id} className={tab === t.id ? "tab active" : "tab"} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
           ))}
-        </>
-      )}
+        </nav>
+        <div className="row">
+          {offline && <span className="badge warn" title="Backend not reachable. Showing sample data.">Offline · sample data</span>}
+          {health.demo_mode && <span className="badge">Demo</span>}
+          {health.sandboxed && <span className="badge" title="Agents run inside an NVIDIA OpenShell sandbox">Sandboxed</span>}
+          {!health.brain_enabled && <span className="badge warn">Brain off</span>}
+          <button className="primary" onClick={toggleShift}>
+            {health.shift_running ? "Stop shift" : "Start shift"}
+          </button>
+        </div>
+      </header>
 
-      <h3>Shared memory ({lessons.length})</h3>
-      <ul>{lessons.map((l, i) => <li key={i}>{l}</li>)}</ul>
+      <div className="content">
+        {tab === "shift" && <ShiftView deals={deals} events={events} onOpen={setOpenId} onDecide={decide} />}
+        {tab === "brain" && <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />}
+        {tab === "eval" && <EvalView result={evalResult} onRun={() => api.runEval().then(refresh)} />}
+      </div>
+
+      <footer className="muted small">Nemotron on Crusoe · Search by You.com</footer>
+
+      {open && <DealPanel deal={open} events={events} onClose={() => setOpenId(null)} onDecide={decide} />}
     </div>
   );
 }
