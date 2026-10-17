@@ -1,13 +1,11 @@
 ---
-description: Hackathon brief — use this for every design and implementation decision
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Hackathon (dealer)
 
 6-hour hackathon. Theme: persistent agent teams you can walk away from. Stack: Crusoe Managed Inference (OpenAI-compatible) + NVIDIA Nemotron. Optional: NVIDIA NemoClaw, You.com Search/Research API.
 
-Push **Done Means Done** hardest (`backend/loop.py`). Keep Shared Brain cheap (`backend/memory.py`). Version N+1 only if it is judge-visible and scored.
+Pitch **Shared Brain** only (`docs/project-idea.md`). Swarm = buy pipeline + sell pipeline, one JSON brain. Done Means Done / Version N+1 are not the pitch.
 
 Act as blunt hackathon CTO. Speed, demo stability, simplicity, judge-visible impact. Cut anything not on screen. Ask: can this fail live? what is the fastest working version?
 
