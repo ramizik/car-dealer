@@ -11,10 +11,11 @@ type Props = {
   events: AgentEvent[];
   onClose: () => void;
   onDecide: (id: string, yes: boolean) => void;
+  onSale: (id: string, yes: boolean) => void;
 };
 
 
-export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
+export default function DealPanel({ deal, events, onClose, onDecide, onSale }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const step = STAGES.findIndex((s) => s.state === deal.state);
   const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
@@ -58,6 +59,21 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
 
         {!stopped && (deal.live || deal.turn) && <TurnBanner deal={deal} />}
         {!stopped && deal.turn?.who === "seller" && <SellerTurn dealId={deal.id} offer={deal.turn.offer} />}
+
+        {deal.state === "awaiting_sale" && (
+          <section aria-label="Sale decision needed">
+            <div className="decision">
+              <div>
+                <h3>Sell for {money(deal.sale_offer)}?</h3>
+                <p>A buyer accepted this price. Nothing sells until you say yes.</p>
+              </div>
+              <div className="actions">
+                <button onClick={() => onSale(deal.id, false)}>Keep talking</button>
+                <button className="primary" onClick={() => onSale(deal.id, true)}>Sell</button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {deal.state === "awaiting_approval" && (
           <section aria-label="Decision needed">

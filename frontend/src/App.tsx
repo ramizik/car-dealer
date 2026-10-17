@@ -274,8 +274,29 @@ export default function App() {
               deals={deals} filters={inventoryFilters} columns={inventoryCols} empty="No cars here yet." onOpen={setOpenId} />
           )}
           {section === "selling" && (
-            <DealsList title="Selling" intro="Your listings and what sold, with profit on each car."
-              deals={deals} filters={sellingFilters} columns={sellingCols} empty="No listings yet." onOpen={setOpenId} />
+            <div className="stack">
+              {deals.some((d) => d.state === "awaiting_sale") && (
+                <section className="panel" aria-labelledby="sale-needs">
+                  <div className="panel-head"><h2 id="sale-needs">Sales waiting for your OK</h2></div>
+                  <div className="stack-sm">
+                    {deals.filter((d) => d.state === "awaiting_sale").map((d) => (
+                      <article key={d.id} className="ask">
+                        <div>
+                          <strong>Sell {d.car.split(" · ")[0]} for {money(d.sale_offer)}?</strong>
+                          <p className="small muted">A buyer accepted this price. Listed at {money(d.list_price)}.</p>
+                        </div>
+                        <div className="actions">
+                          <button onClick={() => saleDecide(d.id, false)}>Keep talking</button>
+                          <button className="primary" onClick={() => saleDecide(d.id, true)}>Sell</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <DealsList title="Selling" intro="Your listings and what sold, with profit on each car."
+                deals={deals} filters={sellingFilters} columns={sellingCols} empty="No listings yet." onOpen={setOpenId} />
+            </div>
           )}
           {section === "team" && (
             <div className="stack">
@@ -320,7 +341,7 @@ export default function App() {
         ))}
       </nav>
 
-      {open && <DealPanel deal={open} events={events} onClose={() => setOpenId(null)} onDecide={decide} />}
+      {open && <DealPanel deal={open} events={events} onClose={() => setOpenId(null)} onDecide={decide} onSale={saleDecide} />}
 
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
     </div>
