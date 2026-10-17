@@ -198,8 +198,16 @@ def save_setup(req: SetupReq):
     return dealer_profile.save(req.answers)
 
 
+class DealerReq(BaseModel):
+    answers: dict[str, list[str]] = {}
+    note: str = ""  # owner's free-text rule from the concierge, e.g. "no cars with more than 2 owners"
+
+
 @app.put("/dealer")
-def put_dealer(req: SetupReq):
+def put_dealer(req: DealerReq):
+    if req.note.strip():
+        brain.write("owner", "dealer", "joes-auto", "note", req.note.strip()[:300], confidence=1.0, source="concierge")
+        swarm.emit("owner", "write", f"Your rule saved: {req.note.strip()[:120]}", {})
     return dealer_profile.save(req.answers)
 
 
