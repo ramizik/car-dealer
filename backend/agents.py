@@ -13,6 +13,7 @@ import conversations
 import dealer_memory
 import dealer_profile
 import llm
+from agent_tiers import tier_for
 import outreach
 import seller_agent
 import skills
@@ -59,7 +60,7 @@ async def classify_segment(seller_text: str) -> str:
         "Classify a used-car seller from their message. Segments: motivated_private (needs fast sale), "
         "price_anchored (fixated on book value), haggler (enjoys bargaining), wholesaler_repeat (dealer/lot "
         'moving inventory), unknown. Return {"segment": "<one>"}.',
-        seller_text, tier="fast")
+        seller_text, tier=tier_for("buyer/marketplace"))
     seg = out.get("segment") if isinstance(out, dict) else None
     return seg if seg in SEGMENTS and seg != "unknown" else kw
 
@@ -104,7 +105,7 @@ async def _message(deal, tactic, offer, round_, seller_text, memory, party="", s
         f"Car: {car}\nSeller said: {seller_text or '(listing only)'}\nMarket comps mid: {comps}\n"
         f"Recent conversation:\n{history or '(first message)'}\n"
         f"Shared memory:\n" + ("\n".join(memory[:6]) or "(none)"),
-        tier="smart", temperature=0.4)
+        tier=tier_for("buyer/outreach"), temperature=0.4)
     text = text.strip()
     # LLM must not invent prices: fall back if the offer is missing or another $ amount appears
     amounts = {int(re.sub(r"[^\d]", "", a)) for a in re.findall(r"\$[\d,]+", text)}

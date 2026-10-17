@@ -15,8 +15,10 @@ AGENT_TIERS: dict[str, str] = {
     "buyer/marketplace": "fast",      # listing extraction, high volume
     "buyer/outreach": "smart",        # talks to sellers, negotiates
     # Sell swarm
-    "seller/listing": "fast",         # clone listing pack per channel
+    "seller/listing": "smart",        # writes the listing pack per channel
     "seller/enquiry": "smart",        # talks to buyers, closes
+    "scout": "fast",                  # listing search subagent (= buyer/marketplace)
+    "appraiser": "smart",             # market value from research (= buyer/kbb)
     # Dealer consignment and auction
     "dealer/onboarding": "fast",      # intake questions, saves answers
     "dealer/consignment-listing": "fast",

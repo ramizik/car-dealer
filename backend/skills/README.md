@@ -30,9 +30,9 @@ Tiers and model IDs are in `backend/llm.py`; the agent-to-tier map is `backend/a
 
 | Agent | Tier | Why |
 |---|---|---|
-| Owner, buyer lead, seller lead | smart (Nemotron 3 Super) | approvals and routing need reasoning |
+| Owner lead, buyer agent (outreach, kbb), seller agent (listing, enquiry) | smart (Nemotron 3 Super) | approvals and routing need reasoning |
 | buyer/kbb, buyer/outreach, seller/enquiry, dealer/auction | smart | valuation, negotiation, bid decisions |
-| buyer/marketplace, seller/listing, dealer/onboarding, dealer/consignment-listing | fast (Nemotron 3 Nano) | high-volume extraction and cloning |
+| buyer/marketplace (listing search), dealer/onboarding, dealer/consignment-listing | fast (Nemotron 3 Nano) | high-volume extraction and cloning |
 | sim/seller, sim/buyer, librarian | sim (Nemotron 3.5 Lightning) | simulated counterparties, long-running workers |
 | photo checks | vision (Nemotron 3 Nano Omni) | image input |
 
