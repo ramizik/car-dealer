@@ -1,12 +1,99 @@
-# Dealer onboarding questions. Source: backend/skills/dealer/onboarding/SKILL.md.
-# Answers are not persisted yet; the app shows them and asks the dealer to confirm.
+# Dealer onboarding: multiple choice so a dealer can finish in about two minutes.
+# Source of truth for the Dealer setup screen. Answers are not persisted yet.
+# Every option has a value (stored) and a label (shown). "recommended" marks the default most dealers pick.
 
 QUESTIONS = [
-    {"id": "identity", "ask": "Legal name, dealer licence number, city and state, and who approves deals (name, phone or Telegram)."},
-    {"id": "sell", "ask": "Which cars may we list for you, and on which platforms (storefront, Facebook Marketplace-style, Craigslist-style, Autotrader-style)? What fee per sale?"},
-    {"id": "buy", "ask": "Which makes and models do you want, at what price band and mileage cap? Clean title only?"},
-    {"id": "auction", "ask": "Which auctions may we bid at, and what is the max bid per car? Do you approve each bid first?"},
-    {"id": "approvals", "ask": "What needs your YES: every buy, every sale below floor, every bid, every posting?"},
-    {"id": "inventory", "ask": "Send your inventory: VIN, year, make, model, miles, asking price, floor, photos, title status, known issues."},
-    {"id": "authority", "ask": "Do you authorise us to post your listings and bid on your behalf within these rules?"},
+    {
+        "id": "dealer_type",
+        "ask": "What kind of dealership are you?",
+        "type": "single",
+        "options": [
+            {"value": "independent", "label": "Independent used-car lot"},
+            {"value": "franchise", "label": "Franchise dealer"},
+            {"value": "wholesale", "label": "Wholesale only"},
+        ],
+    },
+    {
+        "id": "sell_channels",
+        "ask": "Where should we list your cars for sale?",
+        "type": "multi",
+        "options": [
+            {"value": "storefront", "label": "Our website", "recommended": True},
+            {"value": "facebook", "label": "Facebook Marketplace"},
+            {"value": "craigslist", "label": "Craigslist"},
+            {"value": "autotrader", "label": "Autotrader"},
+        ],
+    },
+    {
+        "id": "buy_types",
+        "ask": "What types of cars do you want to buy?",
+        "type": "multi",
+        "options": [
+            {"value": "trucks", "label": "Trucks"},
+            {"value": "suvs", "label": "SUVs"},
+            {"value": "sedans", "label": "Sedans"},
+            {"value": "evs", "label": "Electric"},
+            {"value": "any", "label": "Anything that fits", "recommended": True},
+        ],
+    },
+    {
+        "id": "price_band",
+        "ask": "What price range?",
+        "type": "single",
+        "options": [
+            {"value": "under_15k", "label": "Under $15k"},
+            {"value": "15k_30k", "label": "$15k to $30k", "recommended": True},
+            {"value": "30k_45k", "label": "$30k to $45k"},
+            {"value": "over_45k", "label": "Over $45k"},
+        ],
+    },
+    {
+        "id": "max_miles",
+        "ask": "Highest mileage you will take?",
+        "type": "single",
+        "options": [
+            {"value": "80k", "label": "Under 80k miles"},
+            {"value": "120k", "label": "Under 120k miles", "recommended": True},
+            {"value": "any", "label": "Any mileage"},
+        ],
+    },
+    {
+        "id": "title_rule",
+        "ask": "Which titles are OK?",
+        "type": "single",
+        "options": [
+            {"value": "clean_only", "label": "Clean titles only", "recommended": True},
+            {"value": "ask_first", "label": "Rebuilt too, but ask me first"},
+        ],
+    },
+    {
+        "id": "auctions",
+        "ask": "Should the team bid at auctions for you?",
+        "type": "single",
+        "options": [
+            {"value": "ask_each", "label": "Yes, ask me before each bid", "recommended": True},
+            {"value": "auto_within_max", "label": "Yes, bid automatically within my max"},
+            {"value": "no", "label": "No auctions"},
+        ],
+    },
+    {
+        "id": "approver",
+        "ask": "Who approves buys and sales?",
+        "type": "single",
+        "options": [
+            {"value": "me_text", "label": "Me, by text", "recommended": True},
+            {"value": "me_dashboard", "label": "Me, in this dashboard"},
+            {"value": "manager", "label": "My manager"},
+        ],
+    },
+    {
+        "id": "inventory",
+        "ask": "How do you want to add your cars?",
+        "type": "single",
+        "options": [
+            {"value": "upload", "label": "Upload a spreadsheet"},
+            {"value": "forward", "label": "Send a list by text"},
+            {"value": "later", "label": "Add them later", "recommended": True},
+        ],
+    },
 ]

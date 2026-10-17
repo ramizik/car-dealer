@@ -80,4 +80,10 @@ export type EvalResult = {
   rows: { scenario: string; segment: string; off: string; on: string }[];
 };
 
-export type OnboardingQuestion = { id: string; ask: string };
+export type OnboardingOption = { value: string; label: string; recommended?: boolean };
+export type OnboardingQuestion = {
+  id: string;
+  ask: string;
+  type: "single" | "multi";
+  options: OnboardingOption[];
+};

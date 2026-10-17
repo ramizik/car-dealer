@@ -3,8 +3,8 @@ import type { Brain } from "./types";
 const SCOPES: { key: keyof Brain["scopes"]; title: string; hint: string }[] = [
   { key: "dealer", title: "Your rules", hint: "What you told us you want" },
   { key: "parties", title: "Sellers & buyers", hint: "What we learned about people" },
-  { key: "market", title: "Market", hint: "Prices, recon, shipping, days to sell" },
-  { key: "playbook", title: "What works", hint: "Tactics that win, per seller type" },
+  { key: "market", title: "Market", hint: "Prices, repairs, shipping, days to sell" },
+  { key: "playbook", title: "What works", hint: "Tactics that win, by seller type" },
 ];
 
 type Props = { brain: Brain; onSnapshot: (name: "cold" | "warm") => void };
@@ -12,30 +12,27 @@ type Props = { brain: Brain; onSnapshot: (name: "cold" | "warm") => void };
 export default function BrainView({ brain, onSnapshot }: Props) {
   const { stats } = brain;
   return (
-    <div className="stack">
-      <p className="lede">
-        Every agent reads this memory before it acts and adds to it after. It is shared across the whole team.
-      </p>
-
-      <section className="summary">
-        <div className="stat"><span className="value">{stats.events}</span><span className="muted">Things learned</span></div>
-        <div className="stat"><span className="value">{stats.kb} KB</span><span className="muted">Memory size</span></div>
-        {stats.kb_before_compaction !== undefined && (
-          <div className="stat">
-            <span className="value">−{Math.round((1 - stats.kb / stats.kb_before_compaction) * 100)}%</span>
-            <span className="muted">After cleanup ({stats.kb_before_compaction} → {stats.kb} KB)</span>
-          </div>
-        )}
-        <div className={`stat ${brain.conflicts.length ? "warn" : ""}`}>
-          <span className="value">{brain.conflicts.length}</span><span className="muted">Disagreements</span>
+    <>
+      <section className="summary" aria-label="Memory at a glance">
+        <div className="stat"><span className="value">{stats.events}</span><span className="label">Things learned</span></div>
+        <div className="stat"><span className="value">{stats.kb} KB</span><span className="label">Memory size</span></div>
+        <div className={`stat ${brain.conflicts.length ? "attn" : ""}`}>
+          <span className="value">{brain.conflicts.length}</span>
+          <span className="label">Disagreements to review</span>
         </div>
       </section>
 
-      <section className="grid4">
+      {stats.kb_before_compaction !== undefined && (
+        <p className="muted small">
+          Cleaned up automatically: {stats.kb_before_compaction} KB down to {stats.kb} KB.
+        </p>
+      )}
+
+      <section className="cards4" aria-label="What the team knows">
         {SCOPES.map((s) => (
-          <div key={s.key} className="column">
-            <h3 title={s.hint}>{s.title}</h3>
-            <p className="muted small">{s.hint}</p>
+          <div key={s.key} className="scope">
+            <h3>{s.title}</h3>
+            <p className="small">{s.hint}</p>
             {brain.scopes[s.key].length === 0 && <p className="empty">Nothing learned yet</p>}
             <ul className="facts">
               {brain.scopes[s.key].map((f) => <li key={f}>{f}</li>)}
@@ -44,11 +41,12 @@ export default function BrainView({ brain, onSnapshot }: Props) {
         ))}
       </section>
 
-      <section>
-        <h2>Negotiation tactics</h2>
+      <section aria-labelledby="tactics">
+        <h2 id="tactics">Negotiation tactics</h2>
+        <p className="muted small">How often each approach closed a deal, by seller type.</p>
         <table>
           <thead>
-            <tr><th>Tactic</th><th>Seller type</th><th>Won</th><th className="wide">Win rate</th></tr>
+            <tr><th>Tactic</th><th>Seller type</th><th>Won</th><th>Win rate</th></tr>
           </thead>
           <tbody>
             {brain.playbook.map((p) => {
@@ -57,8 +55,15 @@ export default function BrainView({ brain, onSnapshot }: Props) {
                 <tr key={p.tactic + p.segment}>
                   <td>{p.tactic.replace(/_/g, " ")}</td>
                   <td>{p.segment.replace(/_/g, " ")}</td>
-                  <td>{p.wins}/{p.tries}</td>
-                  <td><div className="bar"><div style={{ width: `${rate * 100}%` }} /></div></td>
+                  <td>{p.wins} of {p.tries}</td>
+                  <td>
+                    <div className="row">
+                      <div className="bar" role="img" aria-label={`${Math.round(rate * 100)}% win rate`}>
+                        <div style={{ width: `${rate * 100}%` }} />
+                      </div>
+                      <span className="small">{Math.round(rate * 100)}%</span>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -67,9 +72,9 @@ export default function BrainView({ brain, onSnapshot }: Props) {
       </section>
 
       {brain.conflicts.length > 0 && (
-        <section>
-          <h2>Disagreements</h2>
-          <p className="muted small">Two agents saved different answers. The higher-confidence one is used until resolved.</p>
+        <section aria-labelledby="disagree">
+          <h2 id="disagree">Disagreements</h2>
+          <p className="muted small">Two agents saved different answers. We use the more confident one until you review it.</p>
           {brain.conflicts.map((c) => (
             <div key={c.key} className="conflict">
               <strong>{c.key}</strong>
@@ -81,11 +86,11 @@ export default function BrainView({ brain, onSnapshot }: Props) {
         </section>
       )}
 
-      <section className="row">
-        <span className="muted small">Demo memory:</span>
+      <section className="row" aria-label="Demo controls">
+        <span className="muted small">Demo memory</span>
         <button onClick={() => onSnapshot("cold")}>Start empty</button>
-        <button onClick={() => onSnapshot("warm")}>Load trained</button>
+        <button onClick={() => onSnapshot("warm")}>Load trained memory</button>
       </section>
-    </div>
+    </>
   );
 }

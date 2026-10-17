@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { STAGES, money, profit, time } from "./format";
 import type { AgentEvent, Deal } from "./types";
 
@@ -8,42 +9,71 @@ type Props = {
   onDecide: (id: string, yes: boolean) => void;
 };
 
+const AGENT_NAMES: Record<string, string> = {
+  scout: "Scout",
+  appraiser: "Valuer",
+  negotiator: "Negotiator",
+  seller: "Seller",
+  logistics: "Shipping",
+  librarian: "Memory",
+};
+
 export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
+  const closeRef = useRef<HTMLButtonElement>(null);
   const step = STAGES.findIndex((s) => s.state === deal.state);
   const history = events.filter((e) => e.deal_id === deal.id);
+  const stopped = deal.state === "dropped";
+
+  // Escape closes, and focus starts on the close button so keyboard users are not lost behind the scrim.
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const progress = stopped || step < 0 ? 0 : ((step + 1) / STAGES.length) * 100;
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <aside className="panel" onClick={(e) => e.stopPropagation()}>
-        <header>
+    <div className="scrim" onClick={onClose}>
+      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="deal-title" onClick={(e) => e.stopPropagation()}>
+        <header className="drawer-head">
           <div>
-            <span className="muted">{deal.id} · {deal.location}</span>
-            <h2>{deal.car}</h2>
+            <span className="muted small">{deal.id} · {deal.location}</span>
+            <h2 id="deal-title">{deal.car}</h2>
           </div>
-          <button className="link" onClick={onClose} aria-label="Close">Close</button>
+          <button ref={closeRef} onClick={onClose}>Close</button>
         </header>
 
-        {deal.state === "dropped" ? (
-          <p className="notice blocked">Stopped: {deal.drop_reason}</p>
+        {stopped ? (
+          <p className="notice danger">Stopped: {deal.drop_reason}</p>
         ) : (
-          <ol className="steps">
-            {STAGES.map((s, i) => (
-              <li key={s.state} className={i < step ? "done" : i === step ? "now" : ""}>{s.label}</li>
-            ))}
-          </ol>
+          <>
+            <p className="stage">
+              Step {step + 1} of {STAGES.length}: <strong>{STAGES[step]?.label ?? "Found"}</strong>
+            </p>
+            <div className="progress" role="img" aria-label={`${Math.round(progress)}% through the process`}>
+              <div style={{ width: `${progress}%` }} />
+            </div>
+          </>
         )}
 
         {deal.state === "awaiting_approval" && (
-          <div className="approval">
-            <strong>Buy for {money(deal.offer)}?</strong>
-            <div className="actions">
-              <button onClick={() => onDecide(deal.id, false)}>Decline</button>
-              <button className="primary" onClick={() => onDecide(deal.id, true)}>Approve</button>
+          <section aria-label="Decision needed">
+            <div className="decision">
+              <div>
+                <h3>Buy for {money(deal.offer)}?</h3>
+                <p>Your max is {money(deal.max_buy)}. Nothing is bought until you approve.</p>
+              </div>
+              <div className="actions">
+                <button onClick={() => onDecide(deal.id, false)}>Decline</button>
+                <button className="primary" onClick={() => onDecide(deal.id, true)}>Approve {money(deal.offer)}</button>
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
-        <dl className="numbers">
+        <dl className="facts-grid">
           <Num label="Asking" value={money(deal.asking)} />
           <Num label="Your max" value={money(deal.max_buy)} />
           <Num label="Our offer" value={money(deal.offer)} />
@@ -52,34 +82,24 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
           <Num label="Profit" value={money(profit(deal))} />
         </dl>
 
-        {deal.valuation && (
-          <section>
-            <h3>Market value</h3>
-            <p>
-              {money(deal.valuation.low)} – {money(deal.valuation.high)}, most likely <strong>{money(deal.valuation.mid)}</strong>
-            </p>
-            <ul className="sources">
-              {deal.valuation.citations.map((c) => (
-                <li key={c.url}>
-                  <a href={c.url} target="_blank" rel="noreferrer">{c.title}</a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {deal.valuation && <Valuation {...deal.valuation} />}
 
         {deal.chat.length > 0 && (
-          <section>
-            <h3>Conversation</h3>
+          <section aria-labelledby="conversation">
+            <h3 id="conversation">Conversation</h3>
             <div className="chat">
               {deal.chat.map((t, i) => (
                 <div key={i} className={`bubble ${t.from === "agent" ? "ours" : ""}`}>
-                  <span className="muted">{t.from === "agent" ? `Our agent${t.tactic ? ` · ${t.tactic.replace(/_/g, " ")}` : ""}` : "Seller"}</span>
+                  <span className="who">
+                    {t.from === "agent" ? `Our agent${t.tactic ? ` · ${t.tactic.replace(/_/g, " ")}` : ""}` : "Seller"}
+                  </span>
                   <p>{t.text}</p>
                   {t.recalled && t.recalled.length > 0 && (
-                    <div className="chips" title="What the agent pulled from shared memory before writing this">
-                      <span className="muted">Used memory:</span>
-                      {t.recalled.map((r) => <span key={r} className="chip">{r}</span>)}
+                    <div className="memory">
+                      Used from team memory
+                      <div className="chips">
+                        {t.recalled.map((r) => <span key={r} className="chip">{r}</span>)}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -88,20 +108,42 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
           </section>
         )}
 
-        <section>
-          <h3>History</h3>
-          {history.length === 0 && <p className="empty">No events for this car yet</p>}
+        <section aria-labelledby="history">
+          <h3 id="history">History</h3>
+          {history.length === 0 && <p className="empty">Nothing recorded for this car yet.</p>}
           <ol className="history">
             {history.map((e) => (
               <li key={e.id} className={e.type === "blocked" ? "blocked" : ""}>
-                <span className="muted">{time(e.ts)} · {e.agent}</span> {e.text}
+                <span className="who">{time(e.ts)} · {AGENT_NAMES[e.agent] ?? e.agent}</span>
+                {e.text}
               </li>
             ))}
           </ol>
         </section>
-
       </aside>
     </div>
+  );
+}
+
+function Valuation({ low, mid, high, citations }: NonNullable<Deal["valuation"]>) {
+  const span = high - low || 1;
+  const at = Math.min(100, Math.max(0, ((mid - low) / span) * 100));
+  return (
+    <section aria-labelledby="market">
+      <h3 id="market">Market value</h3>
+      <p>Most likely <strong>{money(mid)}</strong>, usually between {money(low)} and {money(high)}.</p>
+      <div className="range" role="img" aria-label={`Most likely ${money(mid)} within ${money(low)} to ${money(high)}`}>
+        <span className="mid" style={{ left: `${at}%` }} />
+      </div>
+      <div className="range-labels"><span>{money(low)}</span><span>{money(high)}</span></div>
+      <ul className="sources">
+        {citations.map((c) => (
+          <li key={c.url}>
+            <a href={c.url} target="_blank" rel="noreferrer">{c.title}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -109,7 +151,7 @@ function Num({ label, value }: { label: string; value: string }) {
   if (value === "—") return null;
   return (
     <div>
-      <dt className="muted">{label}</dt>
+      <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
   );
