@@ -1,4 +1,4 @@
-# Dealer: a local agent team that runs a used-car dealership's buying and selling, and gets sharper with every deal
+# Carly: a local agent team that runs a used-car dealership's buying and selling, and gets sharper with every deal
 
 > **Track: Problem Statement 2, Shared Brain.** We pitch one track only.
 > Every agent reads one shared memory before it works and writes to it after. We prove the memory makes the team measurably better at negotiating, sourcing and selling.
@@ -7,7 +7,7 @@
 
 ## 1. One-liner
 
-A **large used-car dealership** runs **Dealer** as a local swarm. Two teams share one brain:
+A **large used-car dealership** runs **Carly** as a local swarm. Two teams share one brain:
 
 - **Buy swarm** — continuously watches Kelley Blue Book comps, Facebook Marketplace, Craigslist, Autotrader, auctions and classifieds (via You.com), values cars, talks to people who want to sell, and only buys after the GM approves.
 - **Sell swarm** — keeps a dealer profile / listing pack on every channel we demo, talks to people who want to buy, asks qualifying questions, and closes above floor.

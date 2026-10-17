@@ -187,9 +187,10 @@ export default function App() {
     <div className="shell">
       <aside className="sidebar" aria-label="Main">
         <div className="brand">
-          <span className="logo" aria-hidden="true">D</span>
+          <span className="logo" aria-hidden="true">C</span>
           <div>
-            <strong>{health?.dealer_name ?? "Your dealership"}</strong>
+            <strong>Carly</strong>
+            <span className="muted small">{health?.dealer_name ?? "Your dealership"}</span>
             <span className="muted small">{!health ? "Backend offline" : health.llm_live ? "Live on Nemotron" : "LLM mock mode"}</span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Dealer: an AI agent team for used-car dealers, with a shared brain
+# Carly: an AI agent team for used-car dealers, with a shared brain
 
 A team of Nemotron agents finds real used-car listings, appraises them with cited sources, negotiates with sellers, gets the owner's approval, then lists and sells the car. Every agent reads a **shared brain** before it works and writes to it after, so the team gets better with every deal.
 

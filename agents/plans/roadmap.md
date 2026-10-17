@@ -1,4 +1,4 @@
-# Dealer: 6-hour build roadmap (Shared Brain track)
+# Carly: 6-hour build roadmap (Shared Brain track)
 
 **Status (2026-10-17, after the demo redesign):** P0 to P3 are done in code, and P4 (the eval number) is measured. The dashboard now has a single **Start Demo** button that runs a simulated 8-hour shop day in ~5 minutes with up to 4 deals at once, buying and selling together. Crusoe, You.com, NemoClaw on the droplet, and the brain OFF vs ON eval all run. The live seller call and NVIDIA speech are built and their pieces pass, but the full live call in the browser is not yet verified. P5 (hardening, rehearsals, backup video) has not started. Details in "Current state" below.
 
