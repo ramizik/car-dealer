@@ -9,6 +9,7 @@ import random
 import re
 
 import brain
+import conversations
 import llm
 import skills
 import voice
@@ -85,16 +86,20 @@ def _template(tactic, offer, round_, comps_mid=None):
     return lines.get(tactic, f"I can offer ${offer:,.0f}.") if round_ else f"Hi! Interested in your car. {lines.get(tactic)}"
 
 
-async def _message(deal, tactic, offer, round_, seller_text, memory):
+async def _message(deal, tactic, offer, round_, seller_text, memory, party="", skill_text=""):
     comps = deal.get("comps_mid")
     if not USE_LLM_TEXT or llm._client is None:
         return _template(tactic, offer, round_, comps)
     car = deal.get("car") or deal.get("listing", {}).get("title", "the car")
+    # Only the buyer-talk skill and the last few turns from the conversation file go to the model.
+    history = conversations.recent(party) if party else ""
     text = await llm.chat(
         "You are a used-car buyer negotiating by text for a dealership. Write ONE short message (<=40 words). "
-        f"Use the tactic '{tactic}'. State exactly ${offer:,.0f} and no other price. No emojis.",
+        f"Use the tactic '{tactic}'. State exactly ${offer:,.0f} and no other price. No emojis.\n\n"
+        + skill_text,
         f"Car: {car}\nSeller said: {seller_text or '(listing only)'}\nMarket comps mid: {comps}\n"
-        f"Shared memory:\n" + ("\n".join(memory) or "(none)"),
+        f"Recent conversation:\n{history or '(first message)'}\n"
+        f"Shared memory:\n" + ("\n".join(memory[:6]) or "(none)"),
         tier="smart", temperature=0.4)
     text = text.strip()
     # LLM must not invent prices: fall back if the offer is missing or another $ amount appears
@@ -141,9 +146,10 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     offer = round(min(cap, ask * OPEN_PCT), -1)
     transcript, counter, closed, price, dropped = [], None, False, None, ""
     for r in range(MAX_ROUNDS):
-        msg = await _message(deal, tactic, offer, r, seller_text, memory)
+        msg = await _message(deal, tactic, offer, r, seller_text, memory, party, skill["text"])
         if r == 0:
             msg = f"{msg} {DISCLOSURE.format(dealer=dealer)}"
+        conversations.append(party, "agent", msg, tag=f"${offer:,.0f}, {tactic}")
         entry = {"from": "agent", "text": msg, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []}
         if voice_on and (audio := voice.speak(msg)):
             entry["audio_b64"] = base64.b64encode(audio).decode()
@@ -152,6 +158,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
 
         reply = seller.respond(int(offer), tactic)
         accepted, counter, seller_text = await reply if inspect.isawaitable(reply) else reply
+        if seller_text:
+            conversations.append(party, "seller", seller_text)
         transcript.append({"from": "seller", "text": seller_text, "counter": counter})
         emit("seller", "message", seller_text, {"deal_id": deal_id, "counter": counter})
 
