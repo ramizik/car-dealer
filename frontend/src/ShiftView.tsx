@@ -14,6 +14,7 @@ type Props = {
   onStop: () => void;
   onOpen: (id: string) => void;
   onDecide: (id: string, yes: boolean) => void;
+  onSale: (id: string, yes: boolean) => void;
   onInsights: () => void;
 };
 
@@ -57,7 +58,7 @@ function useNow() {
   return now;
 }
 
-export default function ShiftView({ health, deals, events, brain, evalResult, onStart, onStop, onOpen, onDecide, onInsights }: Props) {
+export default function ShiftView({ health, deals, events, brain, evalResult, onStart, onStop, onOpen, onDecide, onSale, onInsights }: Props) {
   const now = useNow();
   const [size, setSize] = useState(5);
   const [live, setLive] = useState(false);
@@ -81,7 +82,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
   const recalls = shiftEvents.filter((e) => e.type === "recall");
   const llmCalls = Object.values(health?.llm ?? {}).reduce((s, t) => s + (t.calls ?? 0), 0);
 
-  const approvals = deals.filter((d) => d.state === "awaiting_approval");
+  const approvals = deals.filter((d) => d.state === "awaiting_approval" || d.state === "awaiting_sale");
   const current = deals.find((d) => d.id === shift?.deal);
   const waitingOnYou = deals.find((d) => d.turn?.who === "seller");
   const last = events[events.length - 1];
@@ -221,7 +222,18 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
             {approvals.length > 0 && <span className="tag attn">{approvals.length} need you</span>}
           </div>
           <div className="stack-sm">
-            {approvals.map((d) => (
+            {approvals.map((d) => d.state === "awaiting_sale" ? (
+              <article key={d.id} className="ask">
+                <div>
+                  <strong>Sell {d.car.split(" · ")[0]} for {money(d.sale_offer)}?</strong>
+                  <p className="small muted">A buyer accepted this price. Nothing sells until you say yes. Listed at {money(d.list_price)}.</p>
+                </div>
+                <div className="actions">
+                  <button onClick={() => onSale(d.id, false)}>Keep talking</button>
+                  <button className="primary" onClick={() => onSale(d.id, true)}>Sell</button>
+                </div>
+              </article>
+            ) : (
               <article key={d.id} className="ask">
                 <div>
                   <strong>Buy {d.car.split(" · ")[0]} for {money(d.offer)}?</strong>

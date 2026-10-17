@@ -5,6 +5,7 @@ export type DealState =
   | "appraised"
   | "negotiating"
   | "awaiting_approval"
+  | "awaiting_sale"
   | "bought"
   | "in_transit"
   | "delivered"
@@ -49,6 +50,7 @@ export type Deal = {
   car: string;
   location: string;
   state: DealState;
+  sale_offer?: number; // a buyer accepted this price; it sells only with your OK
   asking: number;
   offer?: number;
   max_buy: number;

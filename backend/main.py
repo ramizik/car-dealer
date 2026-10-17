@@ -212,6 +212,18 @@ def flag(deal_id: str, req: FlagReq):
     return {"ok": True, "deal_id": deal_id, "party": party}
 
 
+class SaleReq(BaseModel):
+    yes: bool
+
+
+@app.post("/deals/{deal_id}/sale")
+async def decide_sale(deal_id: str, req: SaleReq):
+    """Dealer's OK (yes) or no to a buyer's accepted price. Nothing sells without a yes."""
+    if not swarm.sale_decision(deal_id, req.yes):
+        return JSONResponse({"ok": False, "error": "no sale is waiting for an answer"}, status_code=409)
+    return {"ok": True, "deal_id": deal_id}
+
+
 @app.post("/deals/{deal_id}/approve")
 async def decide(deal_id: str, req: DecisionReq):
     """Save the dealer's answer so the team acts on it next time, even if this deal is not in memory yet."""

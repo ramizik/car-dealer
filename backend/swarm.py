@@ -199,10 +199,39 @@ async def _appraise(deal: dict) -> None:
          {"deal_id": deal["id"], "sources": len(val["citations"]), "citations": val["citations"], "flags": risk.get("flags", [])})
 
 
-async def _sell(deal: dict, buyer: sim.Buyer) -> None:
-    """List at the resale quote, then step down toward the simulated buyer. A walk-away means a discounted sale.
+MAX_BUYERS = 8  # buyers tried per car before it waits for a fresh shift
+SALE_EVENTS: dict[str, asyncio.Event] = {}  # deal_id -> set when the dealer answers a sale
+SALE_ANSWER: dict[str, bool] = {}
 
-    The buyer chat goes through the same memory layers as the buy side: private log, then one shared artifact."""
+
+async def _ask_sale(deal: dict, price: int) -> bool:
+    """A buyer accepted. Nothing sells until the dealer says yes. Returns the dealer's answer."""
+    ev = asyncio.Event()
+    SALE_EVENTS[deal["id"]] = ev
+    SALE_ANSWER.pop(deal["id"], None)
+    deal["state"], deal["sale_offer"] = "awaiting_sale", price
+    emit("buyer", "approval", f"Buyer will pay ${price:,} for {deal['car']}. Your OK to sell?",
+         {"deal_id": deal["id"], "price": price})
+    await ev.wait()
+    SALE_EVENTS.pop(deal["id"], None)
+    return SALE_ANSWER.pop(deal["id"], False)
+
+
+def sale_decision(deal_id: str, yes: bool) -> bool:
+    """Dealer answer to a sale. False if nothing is waiting for one."""
+    deal, ev = DEALS.get(deal_id), SALE_EVENTS.get(deal_id)
+    if not deal or deal.get("state") != "awaiting_sale" or ev is None:
+        return False
+    SALE_ANSWER[deal_id] = bool(yes)
+    ev.set()
+    emit("owner", "state", f"{'Approved' if yes else 'Declined'} the sale of {deal['car']} at ${deal['sale_offer']:,}",
+         {"deal_id": deal_id})
+    return True
+
+
+async def _sell(deal: dict, buyer: sim.Buyer) -> bool:
+    """List at the resale quote and talk to one buyer. An accepted price waits for the dealer.
+    Returns True when the car sells. A walk-away leaves it listed for the next buyer."""
     price = int(deal["list_price"])
     party = f"buyer:{deal['id']}"
     emit("seller", "state", f"Listed {deal['car']} at ${price:,}", {"deal_id": deal["id"], "price": price})
@@ -210,7 +239,7 @@ async def _sell(deal: dict, buyer: sim.Buyer) -> None:
     deal["chat"].append({"from": "buyer", "text": opening})
     conversations.append(party, "buyer", opening)
     emit("seller", "message", f"Buyer: {opening}", {"deal_id": deal["id"]})
-    sold, rounds = None, 0
+    rounds = 0
     for _ in range(6):
         rounds += 1
         msg = f"It's ${price:,}, inspected and detailed. Can you do that?"
@@ -222,22 +251,26 @@ async def _sell(deal: dict, buyer: sim.Buyer) -> None:
             conversations.append(party, "buyer", text)
             emit("seller", "message", f"Buyer: {text}", {"deal_id": deal["id"], "counter": counter})
         if accepted:
-            sold = price
-            break
+            if not await _ask_sale(deal, price):
+                emit("seller", "state", f"Not selling {deal['car']} at ${price:,}; the car stays listed", {"deal_id": deal["id"]})
+                deal["state"] = "listed"
+                return False
+            deal["sold_for"], deal["state"] = price, "sold"
+            gain = price - deal["bought_for"]
+            emit("seller", "state", f"Sold {deal['car']} for ${price:,} ({'+' if gain >= 0 else '-'}${abs(gain):,})",
+                 {"deal_id": deal["id"], "price": price})
+            seller_agent.record_sale(deal, days=random.Random(deal["id"]).randint(9, 40), sold_for=price, source=deal["id"])
+            mem = await memory_layer.consolidate("seller", party, deal["id"], {
+                "closed": True, "price": price, "ask": deal["list_price"], "rounds": rounds,
+                "tactic": "step_down", "segment": getattr(buyer, "persona", "buyer")})
+            emit("seller", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal["id"], **mem})
+            return True
         if counter is None:
-            sold = buyer.last_offer  # buyer walked: take their last number rather than hold the car
-            break
+            break  # buyer walked away; the car stays listed for the next buyer
         price = max(counter, round(price - (price - counter) * 0.5, -1))
-    deal["sold_for"] = int(sold if sold is not None else buyer.last_offer)
-    deal["state"] = "sold"
-    gain = deal["sold_for"] - deal["bought_for"]
-    emit("seller", "state", f"Sold {deal['car']} for ${deal['sold_for']:,} ({'+' if gain >= 0 else '-'}${abs(gain):,})",
-         {"deal_id": deal["id"], "price": deal["sold_for"]})
-    seller_agent.record_sale(deal, days=random.Random(deal["id"]).randint(9, 40), sold_for=deal["sold_for"], source=deal["id"])
-    mem = await memory_layer.consolidate("seller", party, deal["id"], {
-        "closed": True, "price": deal["sold_for"], "ask": deal["list_price"], "rounds": rounds,
-        "tactic": "step_down", "segment": getattr(buyer, "persona", "buyer")})
-    emit("seller", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal["id"], **mem})
+    deal["state"] = "listed"
+    emit("seller", "state", f"{deal['car']} still listed at ${deal['list_price']:,}; no sale this round", {"deal_id": deal["id"]})
+    return False
 
 
 async def approve(deal_id: str, yes: bool, reason: str = "") -> bool:
@@ -274,9 +307,12 @@ async def _after_buy(deal: dict) -> None:
         if deal["state"] == "delivered":
             await ops.merchandise(deal, emit)
             save()
-        if deal["state"] == "listed":
-            await asyncio.sleep(ops.DAY_SECS)  # a few simulated days on the lot before the first buyer calls
-            await _sell(deal, sim.make_buyer(_SC[deal["id"]]))
+        for _ in range(MAX_BUYERS):  # new buyers come in over the days the car sits on the lot
+            if deal["state"] != "listed":
+                break
+            await asyncio.sleep(ops.DAY_SECS)
+            if await _sell(deal, sim.make_buyer(_SC[deal["id"]])):
+                break
             save()
     except Exception as e:
         emit("system", "error", f"{deal['id']} after-buy step failed: {type(e).__name__}", {"deal_id": deal["id"]})

@@ -51,6 +51,7 @@ export const api = {
   startShift: (max_deals: number, live = false) => post("/shift/start", { max_deals, live }),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
+  sale: (id: string, yes: boolean) => post(`/deals/${id}/sale`, { yes }),
   sendSellerAudio: (id: string, wav: Blob) =>
     answer(`/deals/${id}/seller-audio`, { body: wav, headers: { "Content-Type": "audio/wav" } }),
   sendSellerText: (id: string, text: string) =>

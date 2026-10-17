@@ -15,6 +15,7 @@ export const STAGES: { state: DealState; label: string }[] = [
   { state: "in_transit", label: "Shipping" },
   { state: "delivered", label: "On the lot" },
   { state: "listed", label: "For sale" },
+  { state: "awaiting_sale", label: "Sale needs your OK" },
   { state: "sold", label: "Sold" },
 ];
 
@@ -24,7 +25,7 @@ export const stageLabel = (s: DealState) => (s === "dropped" ? "Stopped" : STAGE
 export const COLUMNS: { title: string; hint: string; states: DealState[] }[] = [
   { title: "Buying", hint: "Agents are finding, valuing and negotiating", states: ["sourced", "appraised", "negotiating", "awaiting_approval"] },
   { title: "Coming in", hint: "Paid for, on the way to you", states: ["bought", "in_transit", "delivered"] },
-  { title: "For sale", hint: "Listed on your storefront", states: ["listed"] },
+  { title: "For sale", hint: "Listed on your storefront", states: ["listed", "awaiting_sale"] },
   { title: "Sold", hint: "Closed deals", states: ["sold"] },
 ];
 

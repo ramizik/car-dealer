@@ -89,6 +89,12 @@ export default function App() {
     refresh();
   };
 
+  const saleDecide = async (id: string, yes: boolean) => {
+    await api.sale(id, yes);
+    setToast(yes ? "Sold" : "Kept talking to the buyer");
+    refresh();
+  };
+
   const startShift = async (n: number, live = false) => {
     await api.startShift(n, live);
     setToast(`Shift started: up to ${n} deals`);
@@ -256,7 +262,7 @@ export default function App() {
         <main className="content">
           {section === "home" && (
             <ShiftView health={health} deals={deals} events={events} brain={brain} evalResult={evalResult}
-              onStart={startShift} onStop={stopShift} onOpen={setOpenId} onDecide={decide}
+              onStart={startShift} onStop={stopShift} onOpen={setOpenId} onDecide={decide} onSale={saleDecide}
               onInsights={() => { setTeamTab("results"); go("team"); }} />
           )}
           {section === "buying" && (
