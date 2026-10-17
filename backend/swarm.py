@@ -7,6 +7,7 @@ Prices come from code and the sim, never the LLM.
 """
 import asyncio
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -90,6 +91,24 @@ def _on_brain(agent: str, kind: str, payload) -> None:
 
 brain.listeners.append(_on_brain)
 
+_YDC_AGENT = {"scouting": "scout", "sourcing": "scout", "valuing": "appraiser"}
+_YDC_NAME = {youcom.SEARCH_URL: "Search", youcom.CONTENTS_URL: "Contents", youcom.RESEARCH_URL: "Research"}
+
+
+def _on_youcom(kind: str, payload) -> None:
+    """Live You.com calls and failures show up in the feed under the agent that made them."""
+    if kind not in ("call", "error") or not isinstance(payload, dict):
+        return
+    if kind == "error" and "cache miss" in payload.get("error", ""):
+        return  # demo mode / no key: quiet fallback to cache or seed data
+    name = _YDC_NAME.get(payload.get("endpoint"), "API")
+    text = f"You.com {name}: {payload['latency']}s" if kind == "call" else f"You.com {name} failed, using fallback"
+    emit(_YDC_AGENT.get(_state["phase"], "system"), "state", text,
+         {"deal_id": _state["deal"], "tool": "you.com", **payload, "endpoint": name})
+
+
+youcom.listeners.append(_on_youcom)
+
 
 def status() -> dict:
     return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal", "continuous")} | {
@@ -130,16 +149,22 @@ async def _scout() -> None:
     for l in found[:6]:
         brain.write("scout", "market", f"listing:{l.get('make', '')} {l.get('model', '')}".lower(), "obs",
                     {"price": l.get("price"), "miles": l.get("miles"), "url": l.get("url")}, source=l.get("url") or "seed")
-    emit("scout", "state", f"Scanned market: {len(found)} live listings", {"count": len(found)})
+    live = [l for l in found[:6] if (l.get("url") or "").startswith("http")]
+    emit("scout", "state", f"Scanned market via You.com: {len(found)} listings" + ("" if live else " (seed fallback)"),
+         {"count": len(found), "citations": [{"url": l["url"], "title": _title(l)} for l in live[:4]]})
 
 
 async def _appraise(deal: dict) -> None:
-    """Appraiser: You.com research (lite) -> Nano extracts a range; keeps the sim range if anything fails."""
+    """Appraiser: You.com research (lite, search fallback) -> Nano extracts a range; keeps the sim range if it
+    disagrees. Also a You.com check on the VIN for stolen/salvage/scam reports."""
     skills.load("buyer/kbb")
     key = f"value:{deal['car'].split(' · ')[0]}".lower()
     known = brain.recall(["market"], keys=[key], agent="appraiser")
+    listing = (_SC.get(deal["id"]) or {}).get("listing") or {}
+    r, risk = await asyncio.gather(youcom.market_value(deal["car"]), youcom.risk_check(listing))
+    if r.get("sources"):
+        deal["valuation"]["citations"] = r["sources"][:4]  # cited even when the numbers below are not used
     try:
-        r = await youcom.research(f"Current used market value range in USD for a {deal['car']}?", "lite")
         if not r.get("content"):
             raise ValueError("no research")
         v = await llm.chat_json(APPRAISE_SYSTEM, r["content"][:4000], tier=tier_for("appraiser"))
@@ -147,14 +172,21 @@ async def _appraise(deal: dict) -> None:
         if not (0 < lo <= mid <= hi) or abs(mid - deal["valuation"]["mid"]) > deal["valuation"]["mid"] * 0.6:
             raise ValueError("implausible")  # sim prices rule the deal; research must roughly agree
         deal["valuation"].update(low=lo, mid=mid, high=hi, issues=v.get("issues") or [])
-        deal["valuation"]["citations"] = r.get("sources", [])[:4]
     except Exception:
         pass
     val = deal["valuation"]
     brain.write("appraiser", "market", key, "obs", {"low": val["low"], "mid": val["mid"], "high": val["high"]},
                 source=(val["citations"][0]["url"] if val["citations"] else "comps"), confidence=0.6)
-    emit("appraiser", "state", f"Valued {deal['car']} at ${int(val['mid']):,}" + (f" ({len(known)} past notes)" if known else ""),
-         {"deal_id": deal["id"], "sources": len(val["citations"])})
+    if risk.get("flags"):
+        val["risk"] = risk
+        val["issues"] = list(val.get("issues") or []) + [f"web reports: {', '.join(risk['flags'])}"]
+        brain.write("appraiser", "market", f"risk:{key[6:]}", "fact", ", ".join(risk["flags"]), attr="web_flags",
+                    confidence=0.5, source=risk["sources"][0]["url"] if risk["sources"] else "you.com")
+    emit("appraiser", "state", f"Valued {deal['car']} at ${int(val['mid']):,}"
+         + (f", {len(val['citations'])} You.com sources" if val["citations"] else "")
+         + (f", web flags: {', '.join(risk['flags'])}" if risk.get("flags") else "")
+         + (f" ({len(known)} past notes)" if known else ""),
+         {"deal_id": deal["id"], "sources": len(val["citations"]), "citations": val["citations"], "flags": risk.get("flags", [])})
 
 
 async def _sell(deal: dict, buyer: sim.Buyer) -> None:
@@ -306,7 +338,16 @@ async def _run(max_deals: int) -> None:
             except Exception as e:
                 emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
             sc = sim.scenarios(_state["seed"], max(max_deals, LIBRARIAN_EVERY) * 4)
-            for sc_i in (sc["train"] + sc["heldout"]):
+            batch = sc["train"] + sc["heldout"]
+            if os.getenv("DEMO_MODE", "0") == "1" and done_here == 0:
+                # demo: an affordable scam attempt shows up as the second deal, not by luck
+                pool = sim.scenarios(_state["seed"], 60)
+                scam = next((x for x in pool["train"] + pool["heldout"] if x["seller"]["persona"] == "scammer"
+                             and x["seller"]["ask"] <= dealer_profile.get()["buy_limit"]), None)
+                if scam:
+                    batch = [x for x in batch if x["id"] != scam["id"]]
+                    batch.insert(1, scam)
+            for sc_i in batch:
                 if not _state["running"] or (_state["cap"] and _state["n"] >= _state["cap"]):
                     break
                 _phase("sourcing")

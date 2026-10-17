@@ -18,6 +18,7 @@ import dealer_memory  # noqa: E402
 import dealer_profile  # noqa: E402
 import loop  # noqa: E402
 import swarm  # noqa: E402
+import youcom  # noqa: E402
 import memory  # noqa: E402
 import librarian  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
@@ -45,7 +46,7 @@ def health():
     return {"ok": True, "demo_mode": os.getenv("DEMO_MODE", "0") == "1", "brain_enabled": brain.ENABLED,
             "llm_live": llm._client is not None, "sandboxed": False,
             "shift_running": swarm.running(), "shift": swarm.status(), "dealer_name": "Joe's Auto",
-            "llm": llm.stats()}
+            "llm": llm.stats(), "youcom": youcom.stats()}
 
 
 EVAL_FILE = Path(__file__).parent / "data" / "eval_result.json"
@@ -119,6 +120,22 @@ def deal(deal_id: str):
 @app.get("/briefing")
 def briefing():
     return swarm.briefing()
+
+
+class ResearchReq(BaseModel):
+    question: str
+    effort: str = "lite"
+
+
+@app.post("/research")
+async def research(req: ResearchReq):
+    """Cited market answer for the concierge / owner (You.com Research, search fallback, disk cache)."""
+    return await youcom.ask(req.question, req.effort)
+
+
+@app.get("/youcom")
+def youcom_stats():
+    return youcom.stats()
 
 
 @app.get("/events")
@@ -198,6 +215,9 @@ def storefront():
         l = d.get("listing") or {"title": d["car"], "description": "", "bullets": []}
         price = f"SOLD" if d["state"] == "sold" else f"${int(d.get('list_price') or 0):,}"
         bullets = "".join(f"<li>{html.escape(b)}</li>" for b in l.get("bullets", []))
+        m = l.get("market") or {}
+        if m.get("n"):
+            bullets += f"<li><small>Priced against {m['n']} local listings (median ${int(m['median']):,}, via You.com)</small></li>"
         cards.append(f"<article class='{d['state']}'><h2>{html.escape(l['title'])}</h2><p class='price'>{price}</p>"
                      f"<p>{html.escape(l.get('description', ''))}</p><ul>{bullets}</ul><small>{d['id']}</small></article>")
     body = "".join(cards) or "<p>No cars listed yet. The team lists cars as they arrive on the lot.</p>"

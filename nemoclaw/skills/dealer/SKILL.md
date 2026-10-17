@@ -64,6 +64,15 @@ curl -s -X PUT http://10.120.0.2:8000/dealer \
   -H 'Content-Type: application/json' -d '{"note": "Rejects cars with more than 2 owners"}'
 ```
 
+Market question from the owner ("what's a 2018 Tacoma worth?", "transport cost Fresno to Stockton?"). The backend asks You.com Research and returns a cited answer:
+
+```bash
+curl -s -X POST http://10.120.0.2:8000/research \
+  -H 'Content-Type: application/json' -d '{"question":"Fair private-party value of a 2018 Toyota Tacoma SR5 with 80k miles near Stockton CA?"}'
+```
+
+Reply with the number range first, then up to 2 source links. Do not open the links yourself.
+
 What the shared brain learned:
 
 ```bash

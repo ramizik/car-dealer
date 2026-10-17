@@ -80,6 +80,11 @@ async def merchandise(deal: dict, emit) -> None:
     price = int(deal.get("list_price") or 0) or round(deal["bought_for"] * 1.15, -1)
     if sold and sold.get("n", 0) >= 2:  # past sales of this model pull the sticker toward what actually sold
         price = round((price + sold["median"]) / 2, -1)
+    comps = await youcom.retail_comps(deal["car"].split(" · ")[0], HOME)
+    if comps.get("n", 0) >= 3 and 0.6 * price <= comps["median"] <= 1.6 * price:  # live retail asks nudge the sticker
+        price = round(price * 0.75 + comps["median"] * 0.25, -1)
+        brain.write("merchandiser", "market", f"retail_ask|{model}", "obs", float(comps["median"]), attr="usd",
+                    confidence=0.5, source=comps["sources"][0]["url"] if comps["sources"] else "you.com")
     price = int(max(price * (1 + MARKUP), deal["bought_for"] + deal.get("shipping", 0) + 500))
     copy = {}
     if llm._client is not None:
@@ -91,9 +96,11 @@ async def merchandise(deal: dict, emit) -> None:
         copy = _template_listing(deal)
     deal.update(list_price=price, state="listed",
                 listing={"title": str(copy["title"])[:90], "description": str(copy.get("description", ""))[:400],
-                         "bullets": [str(b)[:60] for b in (copy.get("bullets") or [])][:5]})
+                         "bullets": [str(b)[:60] for b in (copy.get("bullets") or [])][:5],
+                         "market": {"median": comps.get("median"), "n": comps.get("n", 0), "sources": comps.get("sources", [])}})
     brain.write("merchandiser", "market", f"listed|{model}", "counter", {"listed": 1}, attr="listings", source=deal["id"])
     emit("merchandiser", "state", f"Published {deal['listing']['title']} at ${price:,} on the storefront"
-         + (f" (priced from {sold['n']} past sales)" if sold and sold.get("n", 0) >= 2 else ""),
-         {"deal_id": deal["id"], "price": price})
+         + (f" (priced from {sold['n']} past sales)" if sold and sold.get("n", 0) >= 2 else "")
+         + (f", vs {comps['n']} You.com retail comps at ${comps['median']:,}" if comps.get("n") else ""),
+         {"deal_id": deal["id"], "price": price, "citations": comps.get("sources", [])})
 

@@ -245,6 +245,67 @@ async def fetch_listings(items: list[dict]) -> list[dict]:
     return out
 
 
+PRICE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})\b")
+
+
+def prices_in(results: list[dict], lo: int = 2000, hi: int = 150000) -> list[int]:
+    """Dollar amounts in search titles/descriptions/snippets, kept within [lo, hi]."""
+    text = " ".join(" ".join([r.get("title") or "", r.get("description") or "", *(r.get("snippets") or [])]) for r in results)
+    return [v for v in (int(m.replace(",", "")) for m in PRICE.findall(text)) if lo <= v <= hi]
+
+
+def _sources(results: list[dict], n: int = 4) -> list[dict]:
+    return [{"url": r["url"], "title": r.get("title", "")} for r in results if r.get("url")][:n]
+
+
+async def retail_comps(car: str, city: str = "Stockton CA") -> dict:
+    """Dealer retail asks for this car: {median, n, prices, sources}. Empty dict if search gives no prices."""
+    results = await search(f"used {car} for sale {city} price", count=10)
+    prices = prices_in(results)
+    if not prices:
+        return {}
+    prices.sort()
+    return {"median": prices[len(prices) // 2], "n": len(prices), "prices": prices[:10], "sources": _sources(results)}
+
+
+async def market_value(car: str) -> dict:
+    """Cited valuation question for the appraiser: Research first, search snippets as the fallback."""
+    r = await research(f"Current used market value range in USD for a {car}? Include common issues to check.", "lite")
+    if r.get("content"):
+        return r
+    results = await search(f"{car} private party value KBB Edmunds", count=8)
+    text = "\n".join(" ".join([x.get("title", ""), x.get("description", ""), *(x.get("snippets") or [])]) for x in results)
+    return {"content": text, "sources": _sources(results)} if text.strip() else {}
+
+
+RISK_WORDS = ("stolen", "scam", "fraud", "salvage", "flood", "odometer", "rollback", "lemon", "recall")
+
+
+async def risk_check(listing: dict) -> dict:
+    """Web check on the VIN for stolen/salvage/flood/scam reports that mention that exact VIN. {flags, sources}.
+    No VIN -> no search (a model-level "scam" query flags every car)."""
+    vin = (listing.get("vin") or "").strip().upper()
+    if len(vin) != 17:
+        return {"flags": [], "sources": []}
+    q = f'"{vin}" stolen OR salvage OR scam OR flood'
+    results = await search(q, count=5)
+    hits = [r for r in results if vin.lower() in json.dumps(r).lower()]
+    text = lambda r: (r.get("title", "") + " " + r.get("description", "")).lower()
+    hits = [r for r in hits if any(w in text(r) for w in RISK_WORDS)]
+    flags = sorted({w for r in hits for w in RISK_WORDS if w in text(r)})
+    return {"flags": flags, "sources": _sources(hits, 3), "query": q}
+
+
+async def ask(question: str, effort: str = "lite") -> dict:
+    """Free-form cited answer for the concierge (POST /research)."""
+    r = await research(question[:500], effort if effort in ("lite", "standard") else "lite")
+    if r.get("content"):
+        return r
+    results = await search(question[:300], count=5)
+    return {"content": "\n".join(f"- {x.get('title', '')}: {x.get('description', '')}" for x in results),
+            "sources": _sources(results), "fallback": "search"} if results else {"content": "", "sources": []}
+
+
 def seed_listings() -> list[dict]:
     """Guaranteed fallback listings (1.D5)."""
     try:
