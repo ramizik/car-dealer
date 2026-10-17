@@ -92,17 +92,13 @@ def run_eval():
     return {"started": True}
 
 
-class ShiftReq(BaseModel):
-    max_deals: int = 5  # 0 = continuous: the team keeps working until /shift/stop
-    live: bool = False  # the first deal's seller is answered by a person in the browser
-
-
-@app.post("/shift/start")
-async def shift_start(req: ShiftReq = ShiftReq()):
-    n = 0 if req.max_deals <= 0 else min(req.max_deals, 20)
+@app.post("/demo/start")
+@app.post("/shift/start")  # old name; the NemoClaw skill still calls it. Any body is ignored: one demo, no options.
+async def shift_start():
+    """Start the simulated shop day: many cars at once, the team asks only when it must."""
     if _eval_running():
         return {"started": False, "error": "eval is running, try again in a few seconds"}
-    return {"started": swarm.start(n, live_seller=req.live), "continuous": n == 0, "live": req.live}
+    return {"started": swarm.start(), "hours": swarm.SHIFT_HOURS, "secs": swarm.SHIFT_SECS, "parallel": swarm.PARALLEL}
 
 
 @app.post("/shift/stop")

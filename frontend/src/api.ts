@@ -48,7 +48,7 @@ export const api = {
   eval: () => get<EvalResult>("/eval"),
   saveSetup: (answers: Record<string, string[]>) => post("/onboarding/answers", { answers }),
   onboardingQuestions: async () => (await get<OnboardingQuestion[]>("/onboarding/questions")) ?? [],
-  startShift: (max_deals: number, live = false) => post("/shift/start", { max_deals, live }),
+  startDemo: () => post("/demo/start"),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
   sale: (id: string, yes: boolean) => post(`/deals/${id}/sale`, { yes }),

@@ -80,6 +80,10 @@ export type ShiftStatus = {
   continuous?: boolean;
   live?: boolean;
   background?: number;
+  active?: number; // cars being found, valued or negotiated right now
+  scouting?: boolean;
+  progress?: number; // 0 to 1 of the shop day
+  sim_minutes?: number; // shop minutes since 8:00 AM
 };
 
 export type LlmTier = { model: string; calls?: number; errors?: number; avg_latency: number | null };

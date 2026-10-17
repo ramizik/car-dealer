@@ -3,7 +3,7 @@
 Plugs into agents.negotiate where the sim seller would go: `await seller.respond(offer, tactic)`.
 That call waits here until the browser posts the seller's answer (audio or typed). No answer in TIMEOUT_S seconds
 and the sim seller answers that round, so the demo never hangs.
-Only the first deal of a live shift uses this (swarm.py).
+One deal per shift uses this (swarm.py); the other deals are simulated so the demo keeps moving without a person.
 """
 import asyncio
 import re
@@ -11,7 +11,7 @@ import time
 
 import llm
 
-TIMEOUT_S = 120
+TIMEOUT_S = 60
 PENDING: dict[str, asyncio.Future] = {}  # deal id -> the answer the negotiator is waiting for
 
 PARSE_SYSTEM = (
@@ -75,6 +75,7 @@ class LiveSeller:
     def __init__(self, deal: dict, fallback, emit):
         self.deal, self.fallback, self.emit = deal, fallback, emit
         self.patience_left = 5
+        self.abandoned = False  # nobody picked up once: the sim seller carries the rest of the call
 
     def opening(self) -> str:
         return ""  # the seller has not spoken yet; the first real words come from the browser
@@ -84,12 +85,15 @@ class LiveSeller:
 
     async def respond(self, offer: int, tactic: str | None = None) -> tuple[bool, int | None, str]:
         deal_id = self.deal["id"]
+        if self.abandoned:
+            return await self.fallback.respond(offer, tactic)
         self.deal["turn"] = {"who": "seller", "action": "answer", "since": time.time(), "offer": offer}
         fut = asyncio.get_running_loop().create_future()
         PENDING[deal_id] = fut
         try:
             text = await asyncio.wait_for(fut, TIMEOUT_S)
         except asyncio.TimeoutError:
+            self.abandoned = True
             self.emit("negotiator", "state", "No answer from the seller, the sim seller answers this round",
                       {"deal_id": deal_id, "timeout": True})
             return await self.fallback.respond(offer, tactic)

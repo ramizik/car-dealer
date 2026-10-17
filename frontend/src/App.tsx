@@ -69,9 +69,9 @@ export default function App() {
     refresh();
   };
 
-  const startShift = async (n: number, live = false) => {
-    await api.startShift(n, live);
-    setToast(`Shift started: up to ${n} deals`);
+  const startShift = async () => {
+    await api.startDemo();
+    setToast("Demo started: a full shop day");
     refresh();
   };
   const stopShift = async () => {
@@ -79,7 +79,7 @@ export default function App() {
     setToast("Shift stopped");
     refresh();
   };
-  const toggleShift = () => (health?.shift_running ? stopShift() : startShift(5));
+  const toggleShift = () => (health?.shift_running ? stopShift() : startShift());
 
   const go = (s: Section) => {
     setSection(s);
@@ -200,10 +200,10 @@ export default function App() {
         <div className="team-card">
           <span className={`status ${running ? "on" : ""}`} role="status">
             <i aria-hidden="true" />
-            {running ? `Shift running · ${health?.shift?.n ?? 0}/${health?.shift?.cap ?? 0}` : "No shift running"}
+            {running ? `Demo running · ${health?.shift?.n ?? 0} cars` : "Demo not running"}
           </span>
           <button className={running ? "" : "primary"} onClick={toggleShift} disabled={!health}>
-            {running ? "Stop shift" : "Start shift"}
+            {running ? "Stop demo" : "Start Demo"}
           </button>
         </div>
       </aside>

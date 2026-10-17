@@ -1,11 +1,14 @@
-"""The shift: runs simulated deals end to end and keeps the state the dashboard reads.
+"""The shift: a simulated working day. Several deals run at the same time, each end to end, and keeps the state the dashboard reads.
 
 Each deal: scout -> appraise -> negotiate -> owner approval -> logistics -> merchandise -> sale to a simulated buyer.
-Continuous mode (max_deals=0) keeps working until stopped; the librarian compacts the brain every few deals.
+The workday compresses DEMO_SHIFT_SECS real seconds into 8 shop hours. Up to DEMO_PARALLEL cars are negotiated at once
+while earlier cars ship, list and sell in the background. Clear wins are bought and sold without asking; borderline
+ones wait for the dealer, and one seller phones in live. The librarian compacts the brain every few deals.
 State is saved to data/state.json, so a restarted backend picks up shipments and listings where they were.
 Prices come from code and the sim, never the LLM.
 """
 import asyncio
+import contextvars
 import json
 import os
 import random
@@ -34,6 +37,13 @@ EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
 _state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
           "phase": "idle", "deal": None, "continuous": False, "live": False, "live_done": False}
+SHIFT_SECS = float(os.getenv("DEMO_SHIFT_SECS", "600"))  # real seconds that stand for one 8-hour shop day
+SHIFT_HOURS = 8
+PARALLEL = int(os.getenv("DEMO_PARALLEL", "3"))  # cars negotiated at the same time
+AUTO_PROFIT_X = 2.0  # buy or sell without asking when profit is at least this many times the dealer's minimum
+MAX_DEALS = 40
+_cur: contextvars.ContextVar = contextvars.ContextVar("deal", default=None)  # the deal the running task works on
+_active: dict[str, str] = {}  # deal id (or "scout") -> what it is doing right now
 STATE_FILE = Path(__file__).parent / "data" / "state.json"
 _tasks: set = set()  # after-buy pipelines running alongside the next negotiation
 
@@ -90,16 +100,23 @@ ROSTER = [
 def roster() -> dict:
     """Who is working right now, from the shift phase and what the deals are doing."""
     phase = _state["phase"]
+    phases = set(_active.values())
     states = {d.get("state") for d in DEALS.values()}
     rows, working = [], 0
     for a in ROSTER:
-        busy = (a.get("phase") == phase) or any(st in states for st in a.get("states", []))
+        busy = (a.get("phase") in phases) or any(st in states for st in a.get("states", []))
         working += busy
         rows.append({"name": a["name"], "role": a["role"], "status": "working" if busy else "idle"})
     return {"working": working, "total": len(ROSTER), "shift_phase": phase, "agents": rows, "demo_names": True}
 
 
 def _phase(phase: str, deal_id: str | None = None) -> None:
+    """Mark what one task is doing. Many tasks run at once; the headline phase is the most recent change."""
+    key = deal_id or _cur.get() or "scout"
+    if phase == "idle":
+        _active.pop(key, None)
+    else:
+        _active[key] = phase
     _state["phase"], _state["deal"] = phase, deal_id
 
 
@@ -113,7 +130,7 @@ def _on_brain(agent: str, kind: str, payload) -> None:
     emit(agent or "librarian", "write", f"{lock}{payload.get('scope')} / {payload.get('key')}: {val}"[:200],
          {"scope": payload.get("scope"), "key": payload.get("key"), "kind": payload.get("kind"),
           "private_to": payload.get("visible_to"),
-          "confidence": payload.get("confidence"), "deal_id": _state["deal"]})
+          "confidence": payload.get("confidence"), "deal_id": _cur.get()})
 
 
 brain.listeners.append(_on_brain)
@@ -130,16 +147,27 @@ def _on_youcom(kind: str, payload) -> None:
         return  # demo mode / no key: quiet fallback to cache or seed data
     name = _YDC_NAME.get(payload.get("endpoint"), "API")
     text = f"You.com {name}: {payload['latency']}s" if kind == "call" else f"You.com {name} failed, using fallback"
-    emit(_YDC_AGENT.get(_state["phase"], "system"), "state", text,
-         {"deal_id": _state["deal"], "tool": "you.com", **payload, "endpoint": name})
+    emit(_YDC_AGENT.get(_active.get(_cur.get() or "scout", ""), "system"), "state", text,
+         {"deal_id": _cur.get(), "tool": "you.com", **payload, "endpoint": name})
 
 
 youcom.listeners.append(_on_youcom)
 
 
+def clock() -> dict:
+    """The simulated shop clock: SHIFT_HOURS of shop time spread over SHIFT_SECS real seconds."""
+    if not _state["started"]:
+        return {"progress": 0.0, "sim_minutes": 0, "sim_hours": SHIFT_HOURS}
+    end = _state["ended"] or time.time()
+    p = min(1.0, (end - _state["started"]) / SHIFT_SECS)
+    return {"progress": round(p, 4), "sim_minutes": int(p * SHIFT_HOURS * 60), "sim_hours": SHIFT_HOURS}
+
+
 def status() -> dict:
+    busy = [k for k in _active if k != "scout"]
     return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal", "continuous", "live")} | {
-        "background": len(_tasks)}
+        "background": len(_tasks), "demo": True, "active": len(busy), "parallel": PARALLEL,
+        "scouting": "scout" in _active, "shift_secs": SHIFT_SECS, **clock()}
 
 
 def running() -> bool:
@@ -229,7 +257,12 @@ SALE_ANSWER: dict[str, bool] = {}
 
 
 async def _ask_sale(deal: dict, price: int) -> bool:
-    """A buyer accepted. Nothing sells until the dealer says yes. Returns the dealer's answer."""
+    """A buyer accepted. A clear win sells by itself; anything else waits for the dealer's yes. Returns the answer."""
+    gain = price - deal["bought_for"] - deal.get("shipping", 0) - seller_agent.RECON
+    if dealer_profile.get()["decision_mode"] != "dealer_decides" or gain >= AUTO_PROFIT_X * seller_agent.min_profit():
+        emit("seller", "state", f"Auto-sold {deal['car']} at ${price:,}: profit ${gain:,} clears your rule, no OK needed",
+             {"deal_id": deal["id"], "price": price, "auto": True})
+        return True
     ev = asyncio.Event()
     SALE_EVENTS[deal["id"]] = ev
     SALE_ANSWER.pop(deal["id"], None)
@@ -323,6 +356,7 @@ def _spawn(deal: dict) -> None:
 
 async def _after_buy(deal: dict) -> None:
     """Logistics -> merchandiser -> seller, in the background so the buy desk keeps negotiating."""
+    _cur.set(deal["id"])
     try:
         if deal["state"] in ("bought", "in_transit"):
             save()
@@ -351,16 +385,18 @@ def resume() -> int:
     return len(todo)
 
 
-async def _one(i: int, sc: dict) -> None:
+async def _one(sc: dict, live_call: bool = False) -> bool:
+    """One car from found to agreed. Several of these run side by side. False when it never became a deal."""
     listing = sc["listing"]
-    deal_id = f"D-{200 + i}"
     comps = round(sc["seller"]["ask"] * random.Random(sc["id"]).uniform(1.05, 1.22), -2)
     # Ceiling = resale estimate - recon - dealer's minimum profit, capped by ask and buy limit.
     max_buy = min(sc["seller"]["ask"], dealer_profile.get()["buy_limit"], comps - seller_agent.RECON - seller_agent.min_profit())
     if max_buy <= 0:
         return False  # no profit possible at any price, not worth a deal row
-    # Live shift: the first deal's seller is a person answering in the browser; the rest are simulated.
-    is_live = bool(_state["live"]) and not _state["live_done"]
+    _state["n"] += 1
+    deal_id = f"D-{200 + _state['n']}"
+    _cur.set(deal_id)
+    is_live = live_call  # one caller per shift is a person answering in the browser; the rest are simulated
     if is_live:
         _state["live_done"] = True
     deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
@@ -370,8 +406,8 @@ async def _one(i: int, sc: dict) -> None:
             "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []},
             "chat": [], "live": is_live, "turn": None}
     DEALS[deal_id], _SC[deal_id] = deal, sc
-    emit("scout", "state", f"Found {deal['car']} in {deal['location']}, asking ${deal['asking']:,}", {"deal_id": deal_id})
     _phase("valuing", deal_id)
+    emit("scout", "state", f"Found {deal['car']} in {deal['location']}, asking ${deal['asking']:,}", {"deal_id": deal_id})
     await _appraise(deal)
     deal["state"] = "appraised"
     await asyncio.sleep(0.3)
@@ -392,84 +428,120 @@ async def _one(i: int, sc: dict) -> None:
     if not r["closed"]:
         deal.update(state="dropped", drop_reason=r.get("dropped") or "no deal")
         save()
-        return
+        return True
     deal["offer"] = int(r["price"])
     deal["_resale"] = (r.get("resale_quote") or {}).get("resale_price")
     deal["state"] = "awaiting_approval"
     deal["turn"] = {"who": "owner", "action": "approve", "since": time.time()}
-    _phase("waiting for owner", deal_id)
-    emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK", {"deal_id": deal_id})
-    save()
-    if dealer_profile.get()["decision_mode"] != "dealer_decides":
+    profit = (r.get("resale_quote") or {}).get("profit")
+    clear = profit is not None and profit >= AUTO_PROFIT_X * seller_agent.min_profit()
+    if clear or dealer_profile.get()["decision_mode"] != "dealer_decides":
+        emit("negotiator", "state", f"Auto-approved {deal['car']} at ${deal['offer']:,}"
+             + (f": profit ~${int(profit):,} clears your rule" if clear else ""), {"deal_id": deal_id, "auto": True})
+        save()
         await approve(deal_id, True)
+        return True
+    _phase("waiting for owner", deal_id)
+    emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK"
+         + (f" (profit ~${int(profit):,} is under your rule)" if profit is not None else ""), {"deal_id": deal_id})
+    save()
+    return True
 
 
 LIBRARIAN_EVERY = 3
+SCOUT_EVERY = 6  # fresh market scan after this many cars started
 
 
-async def _run(max_deals: int) -> None:
-    """max_deals=0: continuous shift, fresh market scans and sellers until someone presses stop."""
+def _supply(first: bool) -> list[dict]:
+    """A fresh batch of cars (scenarios) for the cars still to be found."""
+    _state["seed"] += 1
+    sc = sim.scenarios(_state["seed"], 16)
+    batch = sc["train"] + sc["heldout"]
+    if os.getenv("DEMO_MODE", "0") == "1" and first:
+        # demo: an affordable scam attempt shows up as the second car, not by luck
+        pool = sim.scenarios(_state["seed"], 60)
+        scam = next((x for x in pool["train"] + pool["heldout"] if x["seller"]["persona"] == "scammer"
+                     and x["seller"]["ask"] <= dealer_profile.get()["buy_limit"]), None)
+        if scam:
+            batch = [x for x in batch if x["id"] != scam["id"]]
+            batch.insert(1, scam)
+    real = craigslist.load()
+    if real:  # real Craigslist listings replace the simulated ones; seller behaviour stays simulated
+        batch = [craigslist.as_scenario(x, real[i % len(real)]) for i, x in enumerate(batch)]
+    return batch
+
+
+async def _pipeline(sc: dict, live_call: bool, done: list) -> None:
+    """One car's buy side, as its own task. Never raises: one bad deal must not stop the shift."""
     try:
-        _state["continuous"] = max_deals == 0
-        _state["cap"] = 0 if max_deals == 0 else _state["n"] + max_deals
-        _state["started"], _state["ended"] = time.time(), None
-        done_here = 0
-        emit("system", "state", "Shift started" + (" (continuous, runs until you stop it)" if not max_deals else f" ({max_deals} deals)"), {})
-        while _state["running"] and (not _state["cap"] or _state["n"] < _state["cap"]):
-            _state["seed"] += 1
-            _phase("scouting")
-            try:
-                await _scout()
-            except Exception as e:
-                emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
-            sc = sim.scenarios(_state["seed"], max(max_deals, LIBRARIAN_EVERY) * 4)
-            batch = sc["train"] + sc["heldout"]
-            if os.getenv("DEMO_MODE", "0") == "1" and done_here == 0:
-                # demo: an affordable scam attempt shows up as the second deal, not by luck
-                pool = sim.scenarios(_state["seed"], 60)
-                scam = next((x for x in pool["train"] + pool["heldout"] if x["seller"]["persona"] == "scammer"
-                             and x["seller"]["ask"] <= dealer_profile.get()["buy_limit"]), None)
-                if scam:
-                    batch = [x for x in batch if x["id"] != scam["id"]]
-                    batch.insert(1, scam)
-            real = craigslist.load()
-            if real:  # real Craigslist listings replace the simulated ones; seller behaviour stays simulated
-                batch = [craigslist.as_scenario(x, real[i % len(real)]) for i, x in enumerate(batch)]
-            for sc_i in batch:
-                if not _state["running"] or (_state["cap"] and _state["n"] >= _state["cap"]):
-                    break
-                _phase("sourcing")
+        if await _one(sc, live_call) is not False:
+            done.append(1)
+            if len(done) % LIBRARIAN_EVERY == 0:
+                _active["librarian"] = "tidying memory"
                 try:
-                    if await _one(_state["n"] + 1, sc_i) is not False:
-                        _state["n"] += 1
-                        done_here += 1
-                        if done_here % LIBRARIAN_EVERY == 0:
-                            _phase("tidying memory")
-                            librarian.run(emit)  # distil lessons and tidy memory every few deals
-                except Exception as e:  # one bad deal must not stop the shift
-                    emit("system", "error", f"Deal skipped: {type(e).__name__}", {})
-                save()
-                await asyncio.sleep(0.5)
-                if done_here and done_here % 10 == 0:
-                    break  # long shift: rescan the market every ten deals
-            await asyncio.sleep(1)  # never spin if a whole batch was over the spend limit
+                    librarian.run(emit)  # distil lessons and tidy memory every few deals
+                finally:
+                    _active.pop("librarian", None)
+    except Exception as e:
+        emit("system", "error", f"Deal skipped: {type(e).__name__}", {"deal_id": _cur.get()})
+    finally:
+        if _cur.get():
+            _phase("idle", _cur.get())
+        save()
+
+
+async def _workday() -> None:
+    """The shift: scout, then keep PARALLEL cars in negotiation at once until the shop clock runs out."""
+    try:
+        _state["continuous"], _state["cap"] = False, 0
+        _state["started"], _state["ended"] = time.time(), None
+        end_at = _state["started"] + SHIFT_SECS
+        emit("system", "state", f"Shift started: {SHIFT_HOURS} shop hours, up to {PARALLEL} cars at once", {})
+        queue: list[dict] = []
+        pipes: set = set()
+        done: list = []
+        spawned, next_spawn, first = 0, 0.0, True
+        while _state["running"] and time.time() < end_at:
+            if len(pipes) < PARALLEL and time.time() >= next_spawn and _state["n"] < MAX_DEALS:
+                if not queue or (spawned and spawned % SCOUT_EVERY == 0 and spawned != _state.get("_scouted")):
+                    _state["_scouted"] = spawned
+                    _active["scout"] = "scouting"
+                    try:
+                        await _scout()
+                    except Exception as e:
+                        emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
+                    finally:
+                        _active.pop("scout", None)
+                    if not queue:
+                        queue = _supply(first)
+                        first = False
+                    continue
+                live_call = bool(_state["live"]) and not _state["live_done"] and spawned >= 1
+                t = asyncio.get_running_loop().create_task(_pipeline(queue.pop(0), live_call, done))
+                pipes.add(t)
+                t.add_done_callback(pipes.discard)
+                spawned += 1
+                next_spawn = time.time() + random.uniform(4, 9)  # cars arrive staggered, like a real morning
+            await asyncio.sleep(0.5)
+        emit("system", "state", f"Shop day over: {_state['n']} cars worked" + ("" if not pipes else f", {len(pipes)} still finishing"), {})
     finally:
         _state["running"] = False
         _state["ended"] = time.time()
-        _phase("idle")
+        _active.pop("scout", None)
 
 
-def start(max_deals: int = 5, live_seller: bool = False) -> bool:
+def start() -> bool:
     if _state["running"]:
         return False
     _state["running"] = True
-    _state["live"], _state["live_done"] = live_seller, False
-    _state["task"] = asyncio.get_running_loop().create_task(_run(max_deals))
+    _state["live"], _state["live_done"] = True, False
+    _state["task"] = asyncio.get_running_loop().create_task(_workday())
     return True
 
 
 def stop() -> None:
     _state["running"] = False
+    _state["ended"] = time.time()
 
 
 def public_deals() -> list[dict]:
