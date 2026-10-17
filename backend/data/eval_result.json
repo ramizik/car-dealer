@@ -4,240 +4,200 @@
   "heldout_n": 10,
   "off": {
     "n": 10,
-    "closed": 9,
+    "closed": 5,
     "legit": 9,
-    "close_rate": 1.0,
-    "mean_saved_pct": 13.71,
-    "surplus_captured_pct": 100.6,
-    "mean_rounds": 3.89,
+    "close_rate": 0.556,
+    "mean_saved_pct": 13.4,
+    "surplus_captured_pct": 98.7,
+    "mean_rounds": 4.2,
     "scams_blocked": 1,
     "scams": 1,
-    "correct": 10
+    "correct": 6
   },
   "on": {
     "n": 10,
-    "closed": 8,
+    "closed": 6,
     "legit": 9,
-    "close_rate": 0.889,
-    "mean_saved_pct": 13.82,
-    "surplus_captured_pct": 100.3,
-    "mean_rounds": 3.75,
+    "close_rate": 0.667,
+    "mean_saved_pct": 13.74,
+    "surplus_captured_pct": 106.8,
+    "mean_rounds": 4.67,
     "scams_blocked": 1,
     "scams": 1,
-    "correct": 9
+    "correct": 7
   },
   "train": {
     "n": 20,
-    "closed": 13,
+    "closed": 12,
     "legit": 18,
-    "close_rate": 0.722,
-    "mean_saved_pct": 20.42,
-    "surplus_captured_pct": 125.8,
-    "mean_rounds": 2.85,
+    "close_rate": 0.667,
+    "mean_saved_pct": 15.58,
+    "surplus_captured_pct": 100.6,
+    "mean_rounds": 2.67,
     "scams_blocked": 2,
     "scams": 2,
-    "correct": 15
+    "correct": 14
   },
   "playbook": [
     {
       "tactic": "fast_cash_pickup",
       "segment": "haggler",
-      "tries": 4,
-      "wins": 4,
-      "saved": 0.6083000000000001,
-      "rate": 1.0
-    },
-    {
-      "tactic": "split_difference",
-      "segment": "haggler",
-      "tries": 28,
-      "wins": 28,
-      "saved": 5.726200000000001,
-      "rate": 1.0
-    },
-    {
-      "tactic": "comps_anchor",
-      "segment": "haggler",
-      "tries": 3,
-      "wins": 2,
-      "saved": 0.35,
-      "rate": 0.6666666666666666
-    },
-    {
-      "tactic": "walk_away_threat",
-      "segment": "haggler",
-      "tries": 2,
-      "wins": 1,
-      "saved": 0.132,
-      "rate": 0.5
+      "tries": 14,
+      "wins": 11,
+      "saved": 1.612,
+      "rate": 0.7857142857142857
     },
     {
       "tactic": "volume_relationship",
       "segment": "haggler",
-      "tries": 4,
-      "wins": 1,
-      "saved": 0.1868,
-      "rate": 0.25
-    },
-    {
-      "tactic": "fast_cash_pickup",
-      "segment": "motivated_private",
-      "tries": 35,
-      "wins": 21,
-      "saved": 4.205100000000002,
-      "rate": 0.6
-    },
-    {
-      "tactic": "walk_away_threat",
-      "segment": "motivated_private",
-      "tries": 5,
-      "wins": 2,
-      "saved": 0.21389999999999998,
-      "rate": 0.4
+      "tries": 9,
+      "wins": 7,
+      "saved": 1.0262000000000002,
+      "rate": 0.7777777777777778
     },
     {
       "tactic": "comps_anchor",
-      "segment": "motivated_private",
-      "tries": 5,
-      "wins": 1,
-      "saved": 0.1023,
-      "rate": 0.2
-    },
-    {
-      "tactic": "volume_relationship",
-      "segment": "motivated_private",
-      "tries": 3,
-      "wins": 0,
-      "saved": 0,
-      "rate": 0.0
-    },
-    {
-      "tactic": "split_difference",
-      "segment": "motivated_private",
-      "tries": 2,
-      "wins": 0,
-      "saved": 0,
-      "rate": 0.0
-    },
-    {
-      "tactic": "comps_anchor",
-      "segment": "price_anchored",
-      "tries": 36,
-      "wins": 36,
-      "saved": 7.235100000000001,
-      "rate": 1.0
-    },
-    {
-      "tactic": "split_difference",
-      "segment": "price_anchored",
-      "tries": 4,
-      "wins": 3,
-      "saved": 0.5142,
+      "segment": "haggler",
+      "tries": 8,
+      "wins": 6,
+      "saved": 0.9031000000000001,
       "rate": 0.75
     },
     {
-      "tactic": "volume_relationship",
-      "segment": "price_anchored",
+      "tactic": "walk_away_threat",
+      "segment": "haggler",
       "tries": 5,
       "wins": 3,
-      "saved": 0.4592,
+      "saved": 0.4541,
       "rate": 0.6
     },
     {
-      "tactic": "fast_cash_pickup",
-      "segment": "price_anchored",
-      "tries": 6,
-      "wins": 3,
-      "saved": 0.3405,
-      "rate": 0.5
-    },
-    {
-      "tactic": "walk_away_threat",
-      "segment": "price_anchored",
-      "tries": 3,
-      "wins": 1,
-      "saved": 0.1217,
-      "rate": 0.3333333333333333
-    },
-    {
-      "tactic": "fast_cash_pickup",
-      "segment": "unknown",
-      "tries": 4,
+      "tactic": "split_difference",
+      "segment": "haggler",
+      "tries": 7,
       "wins": 4,
-      "saved": 0.6792,
-      "rate": 1.0
+      "saved": 0.7430000000000001,
+      "rate": 0.5714285714285714
     },
     {
-      "tactic": "walk_away_threat",
-      "segment": "unknown",
-      "tries": 2,
-      "wins": 2,
-      "saved": 0.25429999999999997,
-      "rate": 1.0
+      "tactic": "comps_anchor",
+      "segment": "motivated_private",
+      "tries": 18,
+      "wins": 12,
+      "saved": 1.7032,
+      "rate": 0.6666666666666666
     },
     {
       "tactic": "split_difference",
-      "segment": "unknown",
-      "tries": 3,
+      "segment": "motivated_private",
+      "tries": 16,
+      "wins": 9,
+      "saved": 1.2745,
+      "rate": 0.5625
+    },
+    {
+      "tactic": "fast_cash_pickup",
+      "segment": "motivated_private",
+      "tries": 15,
+      "wins": 7,
+      "saved": 1.2401000000000002,
+      "rate": 0.4666666666666667
+    },
+    {
+      "tactic": "walk_away_threat",
+      "segment": "motivated_private",
+      "tries": 7,
       "wins": 2,
-      "saved": 0.3126,
+      "saved": 0.3247,
+      "rate": 0.2857142857142857
+    },
+    {
+      "tactic": "volume_relationship",
+      "segment": "motivated_private",
+      "tries": 5,
+      "wins": 1,
+      "saved": 0.1692,
+      "rate": 0.2
+    },
+    {
+      "tactic": "fast_cash_pickup",
+      "segment": "price_anchored",
+      "tries": 15,
+      "wins": 10,
+      "saved": 1.2741999999999998,
+      "rate": 0.6666666666666666
+    },
+    {
+      "tactic": "volume_relationship",
+      "segment": "price_anchored",
+      "tries": 12,
+      "wins": 7,
+      "saved": 0.9421999999999999,
+      "rate": 0.5833333333333334
+    },
+    {
+      "tactic": "split_difference",
+      "segment": "price_anchored",
+      "tries": 7,
+      "wins": 4,
+      "saved": 0.5199,
+      "rate": 0.5714285714285714
+    },
+    {
+      "tactic": "walk_away_threat",
+      "segment": "price_anchored",
+      "tries": 7,
+      "wins": 4,
+      "saved": 0.5226000000000001,
+      "rate": 0.5714285714285714
+    },
+    {
+      "tactic": "comps_anchor",
+      "segment": "price_anchored",
+      "tries": 13,
+      "wins": 7,
+      "saved": 1.1303,
+      "rate": 0.5384615384615384
+    },
+    {
+      "tactic": "volume_relationship",
+      "segment": "wholesaler_repeat",
+      "tries": 31,
+      "wins": 24,
+      "saved": 4.369700000000001,
+      "rate": 0.7741935483870968
+    },
+    {
+      "tactic": "split_difference",
+      "segment": "wholesaler_repeat",
+      "tries": 9,
+      "wins": 6,
+      "saved": 0.8716,
       "rate": 0.6666666666666666
     },
     {
       "tactic": "comps_anchor",
-      "segment": "unknown",
-      "tries": 2,
-      "wins": 1,
-      "saved": 0.093,
-      "rate": 0.5
-    },
-    {
-      "tactic": "volume_relationship",
-      "segment": "unknown",
-      "tries": 2,
-      "wins": 1,
-      "saved": 0.0928,
-      "rate": 0.5
-    },
-    {
-      "tactic": "volume_relationship",
-      "segment": "wholesaler_repeat",
-      "tries": 36,
-      "wins": 22,
-      "saved": 4.1583000000000006,
-      "rate": 0.6111111111111112
-    },
-    {
-      "tactic": "comps_anchor",
-      "segment": "wholesaler_repeat",
-      "tries": 4,
-      "wins": 1,
-      "saved": 0.1166,
-      "rate": 0.25
-    },
-    {
-      "tactic": "fast_cash_pickup",
       "segment": "wholesaler_repeat",
       "tries": 5,
-      "wins": 1,
-      "saved": 0.1841,
-      "rate": 0.2
-    },
-    {
-      "tactic": "split_difference",
-      "segment": "wholesaler_repeat",
-      "tries": 5,
-      "wins": 0,
-      "saved": 0,
-      "rate": 0.0
+      "wins": 3,
+      "saved": 0.43420000000000003,
+      "rate": 0.6
     },
     {
       "tactic": "walk_away_threat",
       "segment": "wholesaler_repeat",
       "tries": 2,
-      "wins": 0,
-      "saved": 0,
-      "rate": 0.0
+      "wins": 1,
+      "saved": 0.086,
+      "rate": 0.5
+    },
+    {
+      "tactic": "fast_cash_pickup",
+      "segment": "wholesaler_repeat",
+      "tries": 5,
+      "wins": 2,
+      "saved": 0.27,
+      "rate": 0.4
     }
   ],
   "rows": {
@@ -259,30 +219,30 @@
       {
         "id": "sc-1-21",
         "persona": "haggler",
-        "segment": "unknown",
+        "segment": "haggler",
         "tactic": "comps_anchor",
-        "closed": true,
-        "price": 33540.0,
+        "closed": false,
+        "price": null,
         "ask": 40000.0,
         "floor": 32950,
-        "rounds": 3,
-        "dropped": "",
+        "rounds": 6,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       },
       {
         "id": "sc-1-22",
         "persona": "wholesaler_repeat",
         "segment": "wholesaler_repeat",
         "tactic": "comps_anchor",
-        "closed": true,
-        "price": 31790.0,
+        "closed": false,
+        "price": null,
         "ask": 35800.0,
         "floor": 31700,
-        "rounds": 5,
-        "dropped": "",
+        "rounds": 7,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       },
       {
         "id": "sc-1-23",
@@ -290,10 +250,10 @@
         "segment": "motivated_private",
         "tactic": "comps_anchor",
         "closed": true,
-        "price": 28750.0,
+        "price": 28760.0,
         "ask": 33600.0,
         "floor": 28600,
-        "rounds": 4,
+        "rounds": 5,
         "dropped": "",
         "scam": false,
         "correct": true
@@ -359,28 +319,28 @@
         "persona": "price_anchored",
         "segment": "price_anchored",
         "tactic": "comps_anchor",
-        "closed": true,
-        "price": 31310.0,
+        "closed": false,
+        "price": null,
         "ask": 37300.0,
         "floor": 32650,
-        "rounds": 3,
-        "dropped": "",
+        "rounds": 5,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       },
       {
         "id": "sc-1-29",
         "persona": "haggler",
         "segment": "haggler",
         "tactic": "comps_anchor",
-        "closed": true,
-        "price": 32050.0,
+        "closed": false,
+        "price": null,
         "ask": 36800.0,
         "floor": 31700,
-        "rounds": 4,
-        "dropped": "",
+        "rounds": 5,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       }
     ],
     "on": [
@@ -388,7 +348,7 @@
         "id": "sc-1-20",
         "persona": "price_anchored",
         "segment": "price_anchored",
-        "tactic": "walk_away_threat",
+        "tactic": "fast_cash_pickup",
         "closed": true,
         "price": 7290.0,
         "ask": 8300.0,
@@ -401,41 +361,41 @@
       {
         "id": "sc-1-21",
         "persona": "haggler",
-        "segment": "unknown",
-        "tactic": "walk_away_threat",
-        "closed": true,
-        "price": 33540.0,
+        "segment": "haggler",
+        "tactic": "volume_relationship",
+        "closed": false,
+        "price": null,
         "ask": 40000.0,
         "floor": 32950,
-        "rounds": 3,
-        "dropped": "",
+        "rounds": 6,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       },
       {
         "id": "sc-1-22",
         "persona": "wholesaler_repeat",
         "segment": "wholesaler_repeat",
         "tactic": "volume_relationship",
-        "closed": false,
-        "price": null,
+        "closed": true,
+        "price": 30000.0,
         "ask": 35800.0,
         "floor": 31700,
         "rounds": 7,
-        "dropped": "seller walked away",
+        "dropped": "",
         "scam": false,
-        "correct": false
+        "correct": true
       },
       {
         "id": "sc-1-23",
         "persona": "motivated_private",
         "segment": "motivated_private",
-        "tactic": "fast_cash_pickup",
+        "tactic": "comps_anchor",
         "closed": true,
-        "price": 27740.0,
+        "price": 28760.0,
         "ask": 33600.0,
         "floor": 28600,
-        "rounds": 3,
+        "rounds": 5,
         "dropped": "",
         "scam": false,
         "correct": true
@@ -500,31 +460,31 @@
         "id": "sc-1-28",
         "persona": "price_anchored",
         "segment": "price_anchored",
-        "tactic": "fast_cash_pickup",
-        "closed": true,
-        "price": 32750.0,
+        "tactic": "volume_relationship",
+        "closed": false,
+        "price": null,
         "ask": 37300.0,
         "floor": 32650,
-        "rounds": 4,
-        "dropped": "",
+        "rounds": 5,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       },
       {
         "id": "sc-1-29",
         "persona": "haggler",
         "segment": "haggler",
         "tactic": "fast_cash_pickup",
-        "closed": true,
-        "price": 32050.0,
+        "closed": false,
+        "price": null,
         "ask": 36800.0,
         "floor": 31700,
-        "rounds": 4,
-        "dropped": "",
+        "rounds": 5,
+        "dropped": "seller walked away",
         "scam": false,
-        "correct": true
+        "correct": false
       }
     ]
   },
-  "secs": 14.1
+  "secs": 23.6
 }

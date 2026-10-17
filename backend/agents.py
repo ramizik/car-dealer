@@ -31,10 +31,14 @@ DISCLOSURE = "(Heads up: I'm an AI assistant buying on behalf of {dealer}.)"
 USE_LLM_TEXT = os.getenv("AGENT_TEXT", "1") == "1"  # eval sets 0 to save calls
 
 KEYWORDS = {
-    "motivated_private": ["moving", "need it gone", "asap", "quick sale", "relocat", "baby", "divorce", "deploy"],
-    "price_anchored": ["kbb", "blue book", "firm", "worth", "edmunds", "not budging", "know what it's worth"],
-    "haggler": ["best offer", "make me an offer", "negotiable", "obo", "talk me", "let's deal"],
-    "wholesaler_repeat": ["lot", "inventory", "dealer", "wholesale", "another one", "units", "auction"],
+    "motivated_private": ["moving", "need it gone", "asap", "quick sale", "relocat", "baby", "divorce", "deploy",
+                          "gone", "fast", "this weekend", "done fast", "has to go", "move next"],
+    "price_anchored": ["kbb", "blue book", "firm", "worth", "edmunds", "not budging", "know what it's worth",
+                       "comps", "fair", "higher than", "looked up"],
+    "haggler": ["best offer", "make me an offer", "negotiable", "obo", "talk me", "let's deal",
+                "middle", "come up", "make a deal", "not that low"],
+    "wholesaler_repeat": ["lot", "inventory", "dealer", "wholesale", "another one", "units", "auction",
+                          "more coming", "regularly", "repeat buyer", "move a lot", "send inventory"],
 }
 
 
@@ -156,11 +160,13 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     memory += pb
     emit("negotiator", "recall", f"segment={segment}, tactic={tactic}", {"deal_id": deal_id, "lines": pb})
 
-    # repeat seller: their last counter (as share of their ask) is a better ceiling than max_buy
+    # repeat seller: their last settled share of ask sets a better opening, not a hard ceiling
+    # (a hard cap from a different car pushed offers under the new car's floor and lost the deal)
     cap = max_buy
+    open_pct = OPEN_PCT
     last = (known.get("facts", {}).get("last_counter_pct") or {}).get("value")
     if isinstance(last, (int, float)):
-        cap = min(cap, ask * float(last))
+        open_pct = max(OPEN_PCT, float(last) - 0.04)
 
     # The dealer's setup: only buy if they asked us to, and never above their per-car limit.
     profile = dealer_profile.get()
@@ -195,7 +201,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         max_buy = min(max_buy, profit_cap)
         cap = min(cap, max_buy)
 
-    offer = round(min(cap, ask * OPEN_PCT), -1)
+    offer = round(min(cap, ask * open_pct), -1)
     channel = outreach.channel_for(segment, "seller", deal.get("channels"))
     transcript, counter, closed, price, dropped = [], None, False, None, ""
     for r in range(MAX_ROUNDS):
@@ -239,6 +245,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             emit("negotiator", "message", question, {"deal_id": deal_id, "kind": "ask_number"})
         if r == 0 and segment == "unknown":
             segment = await classify_segment(seller_text)
+            if segment != "unknown":  # re-pick so the playbook credits the tactic actually used for this segment
+                tactic = pick_tactic(segment, epsilon, rng)
         if accepted:
             closed, price = True, offer
             break
