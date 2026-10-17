@@ -1,6 +1,6 @@
 # Dealer: 6-hour build roadmap (Shared Brain track)
 
-Companion to `docs/project-idea.md`. Crusoe endpoint, model IDs and rate limits: `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md` (source of truth). Times are hackathon clock, **T+0:00 to T+6:00**.
+Companion to `docs/project-idea.md`. Crusoe endpoint, model IDs and rate limits: `.claude/skills/crusoe-recursive-agents-hackathon/SKILL.md` (source of truth). Times are hackathon clock, **T+0:00 to T+6:00**.
 Every step has an owner lane, the file it touches, and a **done when** check. If a step's timebox runs out, take its fallback and move on.
 
 ---

@@ -282,7 +282,7 @@ We will present only the numbers we actually measure. If the gain is small, we s
 1. NemoClaw installs on our host (`nemoclaw host probe`) and `nemoclaw onboard` accepts a **compatible OpenAI endpoint** (Crusoe base URL, key and Nemotron model).
 2. How to add our own network policy entries (`nemoclaw <name> policy list` / `policy add`) and where blocked requests surface for approval (`openshell term` or the dashboard).
 3. Whether code inside the sandbox can call OpenShell's managed inference route (`inference.local`) so our backend never holds a key.
-4. Crusoe base URL is `https://api.inference.crusoecloud.com/v1`. The current `.env.example` still has the old `api.crusoe.ai` host, which the team skill says to avoid. Confirm exact Nemotron IDs with `GET /v1/models`: Super `nvidia/Nemotron-3-Super-120B-A12B`, Lightning `nvidia/nemotron-3.5-lightning-30b-a3b`, Nano `nvidia/Nemotron-3-Nano-30B-A3B`, Nano Omni `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B`, and Ultra (`nvidia/NVIDIA-Nemotron-3-Ultra-550B`, possibly not enabled for us). Source of truth: `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md`.
+4. Crusoe base URL is `https://api.inference.crusoecloud.com/v1`. The current `.env.example` still has the old `api.crusoe.ai` host, which the team skill says to avoid. Confirm exact Nemotron IDs with `GET /v1/models`: Super `nvidia/Nemotron-3-Super-120B-A12B`, Lightning `nvidia/nemotron-3.5-lightning-30b-a3b`, Nano `nvidia/Nemotron-3-Nano-30B-A3B`, Nano Omni `nvidia/Nemotron-3-Nano-Omni-Reasoning-30B-A3B`, and Ultra (`nvidia/NVIDIA-Nemotron-3-Ultra-550B`, possibly not enabled for us). Source of truth: `.claude/skills/crusoe-recursive-agents-hackathon/SKILL.md`.
 5. You.com key works on all three endpoints (`X-API-Key` header) and the account has credits.
 6. Which messaging channel NemoClaw supports most reliably for our agent (target: Telegram).
 
@@ -290,7 +290,7 @@ We will present only the numbers we actually measure. If the gain is small, we s
 
 ## 15. References
 
-- Team Crusoe skill (endpoint, model IDs, rate limits, reasoning toggles): `agents/skills/crusoe-recursive-agents-hackathon/SKILL.md`
+- Team Crusoe skill (endpoint, model IDs, rate limits, reasoning toggles): `.claude/skills/crusoe-recursive-agents-hackathon/SKILL.md`
 - Build roadmap: `agents/plans/roadmap.md`
 - NemoClaw overview (OpenClaw): https://docs.nvidia.com/nemoclaw/user-guide/openclaw/about/overview.md
 - NemoClaw command reference: https://docs.nvidia.com/nemoclaw/user-guide/openclaw/reference/commands
