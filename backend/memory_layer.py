@@ -31,7 +31,7 @@ def artifact_of(result: dict) -> str:
 async def _summary(party: str) -> str:
     """Cheap-model gist of the chat (fast tier). Empty when there is no key or the call fails."""
     tail = conversations.current(party)  # this deal's turns only: no talk, no gist
-    if not tail or llm._client is None:
+    if not tail or not llm.live():
         return ""
     try:
         text = await llm.chat(

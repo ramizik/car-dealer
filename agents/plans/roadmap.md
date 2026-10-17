@@ -297,7 +297,7 @@ From here on: bug fixes, demo mode, copy, rehearsal. No new features. Anything u
 | Done | # | Lane | Step |
 |---|---|---|---|
 | [~]  5.1 | B | `DEMO_MODE=1`: You.com from cache only, brain loads `cold` at shift start (so learning is visible) or `warm` for the Eval story, sim seeds fixed, simulated clock fast. |
-| [ ]  5.2 | B | Crusoe outage fallback: if 2 consecutive LLM calls fail, switch to mock answers for the negotiation text and keep the deterministic prices. A banner reads "degraded". |
+| [x]  5.2 | B | Crusoe outage fallback: if 2 consecutive LLM calls fail, switch to mock answers for the negotiation text and keep the deterministic prices. A banner reads "degraded". _`llm.live()` gates all LLM text; 60 s cooldown (`LLM_DEGRADE_SECS`), `/health.llm_degraded`, UI banner._ |
 | [ ]  5.3 | C | Demo script dry run #1 against §10 of `docs/project-idea.md`, timed. Note every stumble. |
 | [ ]  5.4 | All | Fix the stumbles from 5.3 only. |
 | [ ]  5.5 | C | Dry run #2, **recorded** (screen + phone) as the backup video. |

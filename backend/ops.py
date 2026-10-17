@@ -87,7 +87,7 @@ async def merchandise(deal: dict, emit) -> None:
                     confidence=0.5, source=comps["sources"][0]["url"] if comps["sources"] else "you.com")
     price = int(max(price * (1 + MARKUP), deal["bought_for"] + deal.get("shipping", 0) + 500))
     copy = {}
-    if llm._client is not None:
+    if llm.live():
         copy = await llm.chat_json(LISTING_SYSTEM + "\n" + skill["text"][:1500],
                                    f"Car: {deal['car']}\nLocation bought: {deal.get('location')}\n"
                                    f"Known issues: {', '.join((deal.get('valuation') or {}).get('issues') or []) or 'none reported'}\n"

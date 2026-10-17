@@ -93,6 +93,7 @@ export type Health = {
   demo_mode: boolean;
   brain_enabled: boolean;
   llm_live?: boolean;
+  llm_degraded?: boolean;
   sandboxed: boolean;
   shift_running?: boolean;
   shift?: ShiftStatus;

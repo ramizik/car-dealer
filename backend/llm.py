@@ -32,6 +32,27 @@ _calls: dict[str, list[float]] = {}  # model -> request timestamps in the last 6
 _locks: dict[str, asyncio.Lock] = {}
 _no_template_kwargs: set[str] = set()  # models that rejected chat_template_kwargs
 STATS: dict[str, dict] = {}  # model -> {calls, errors, latency_total, last_latency}
+DEGRADE_AFTER = 2  # consecutive failed calls before switching to mock text
+DEGRADE_SECS = float(os.getenv("LLM_DEGRADE_SECS", "60"))
+_fails = 0
+_degraded_until = 0.0
+
+
+def degraded() -> bool:
+    return time.monotonic() < _degraded_until
+
+
+def live() -> bool:
+    """Real model text is available: a key is set and Crusoe isn't in a failure cooldown."""
+    return _client is not None and not degraded()
+
+
+def _failed() -> None:
+    global _fails, _degraded_until
+    _fails += 1
+    if _fails >= DEGRADE_AFTER:
+        _degraded_until = time.monotonic() + DEGRADE_SECS
+        _fails = 0
 
 
 async def _throttle(model: str) -> None:
@@ -75,8 +96,19 @@ async def chat(
     max_tokens: int | None = None,
     images: list[str] | None = None,
 ) -> str:
-    if _client is None:
+    global _fails
+    if not live():
         return _mock(system, user)
+    try:
+        out = await _call(system, user, temperature, tier, think, max_tokens, images)
+    except Exception:
+        _failed()
+        raise
+    _fails = 0
+    return out
+
+
+async def _call(system, user, temperature, tier, think, max_tokens, images) -> str:
     model = TIERS[tier]
     content = [{"type": "text", "text": user}] + [
         {"type": "image_url", "image_url": {"url": u}} for u in images or []

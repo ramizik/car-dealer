@@ -57,10 +57,10 @@ def _fast() -> bool:
 
 async def _rewrite(template: str, role: str) -> str:
     """Natural-language rewrite via the sim tier; keeps every number. Falls back to the template."""
-    if _fast():
+    import llm
+    if _fast() or not llm.live():
         return template
     try:
-        import llm
         out = await llm.chat(
             f"You are a {role} texting about a used car. Rewrite the message casually in 1-2 sentences. "
             "Keep every number and URL exactly as written. Never state any other price, including a middle or split price.",

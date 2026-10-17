@@ -59,7 +59,7 @@ def _keyword_segment(text: str) -> str:
 async def classify_segment(seller_text: str) -> str:
     """Nano classifies the seller; keyword fallback if the call fails or returns junk."""
     kw = _keyword_segment(seller_text)
-    if llm._client is None or not seller_text.strip():
+    if not llm.live() or not seller_text.strip():
         return kw
     out = await llm.chat_json(
         "Classify a used-car seller from their message. Segments: motivated_private (needs fast sale), "
@@ -123,7 +123,7 @@ def _template(tactic, offer, round_, comps_mid=None, counter=None):
 
 async def _message(deal, tactic, offer, round_, seller_text, memory, party="", skill_text="", counter=None, previous=()):
     comps = deal.get("comps_mid")
-    if not USE_LLM_TEXT or llm._client is None:
+    if not USE_LLM_TEXT or not llm.live():
         return _template(tactic, offer, round_, comps, counter)
     car = deal.get("car") or deal.get("listing", {}).get("title", "the car")
     # Only the buyer-talk skill and the last few turns from the conversation file go to the model.

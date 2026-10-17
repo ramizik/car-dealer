@@ -223,6 +223,11 @@ export default function App() {
             <button onClick={refresh}>Try again</button>
           </div>
         )}
+        {health?.llm_degraded && (
+          <div className="banner" role="status">
+            <span>Degraded: Nemotron is slow to answer, so messages use templates for a minute. Prices and memory are unchanged.</span>
+          </div>
+        )}
 
         <main className="content">
           {section === "home" && (

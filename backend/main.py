@@ -48,7 +48,7 @@ class RunReq(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True, "demo_mode": os.getenv("DEMO_MODE", "0") == "1", "brain_enabled": brain.ENABLED,
-            "llm_live": llm._client is not None, "sandboxed": False,
+            "llm_live": llm._client is not None, "llm_degraded": llm.degraded(), "sandboxed": False,
             "shift_running": swarm.running(), "shift": swarm.status(), "dealer_name": "Joe's Auto",
             "llm": llm.stats(), "youcom": youcom.stats()}
 
