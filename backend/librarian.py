@@ -11,6 +11,7 @@ import re
 from collections import Counter, defaultdict
 
 import brain
+import conversations
 import skills
 
 MIN_TRIES = 3  # a tactic needs this many tries before it is called a lesson
@@ -87,3 +88,14 @@ def run(emit=None) -> dict:
         emit("librarian", "write", f"Memory tidied: {c['events_before']} -> {c['events_after']} entries, "
              f"{len(out['lessons'])} lessons, {len(out['mistakes'])} new mistakes", out)
     return out
+
+
+def tiers() -> dict:
+    """What each memory layer holds right now, for the Brain tab."""
+    evs = brain.events()
+    private = [e for e in evs if e.get("visible_to")]
+    lessons_now = [n["text"] for k, e in brain.view()["scopes"]["playbook"].items() if k.startswith("lesson|") for n in e["notes"]]
+    chats = sorted(conversations.ROOT.glob("*.md")) if conversations.ROOT.exists() else []
+    return {"private_chats": len(chats),
+            "shared_writes": len(evs) - len(private), "private_writes": len(private),
+            "lessons": lessons_now, "mistakes": skills.mistakes("buyer/outreach")}

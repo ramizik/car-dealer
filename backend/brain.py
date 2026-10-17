@@ -146,7 +146,8 @@ def view(evs: list[dict] | None = None) -> dict:
     for (s, k), by_text in notes.items():
         cap = NOTE_CAP.get(s, NOTE_CAP_DEFAULT)
         kept = sorted(by_text.values(), key=_order)[-cap:]
-        out[s][k]["notes"] = [{"text": e["value"], "confidence": e["confidence"], "agent": e.get("agent", "")} for e in kept]
+        out[s][k]["notes"] = [{"text": e["value"], "confidence": e["confidence"], "agent": e.get("agent", "")}
+                              | ({"private_to": e["visible_to"]} if e.get("visible_to") else {}) for e in kept]
 
     conflicts.sort(key=lambda c: (c["scope"], c["key"], c["attr"]))
     return {"scopes": out, "conflicts": conflicts}

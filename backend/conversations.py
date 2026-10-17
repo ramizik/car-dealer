@@ -65,6 +65,15 @@ def recent(party: str, n: int = KEEP) -> str:
     return "\n".join(turns)
 
 
+def current(party: str) -> str:
+    """Only the turns of the chat still open (nothing from earlier, closed deals). Empty if none."""
+    path = _path(party)
+    if not path.exists():
+        return ""
+    text = path.read_text(encoding="utf-8").split("## Turns\n", 1)[-1]
+    return "\n".join(ln for ln in text.splitlines() if ln.startswith("- **"))
+
+
 def close(party: str, outcome: str) -> None:
     """End of a deal: squeeze every turn into the Earlier section and stamp the outcome. Next chat starts clean."""
     path = _path(party)

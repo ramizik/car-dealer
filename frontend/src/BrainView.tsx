@@ -21,7 +21,7 @@ function lines(e: BrainEntry): string[] {
     const t = c as { tries?: number; wins?: number };
     out.push(t && typeof t === "object" && "tries" in t ? `won ${t.wins ?? 0} of ${t.tries}` : `${a}: ${fmt(c)}`);
   }
-  for (const n of e.notes.slice(-2)) out.push(n.text);
+  for (const n of e.notes.slice(-2)) out.push(n.private_to ? `(private to ${n.private_to.join(", ")}) ${n.text}` : n.text);
   return out;
 }
 
@@ -38,6 +38,34 @@ export default function BrainView({ brain, onSnapshot }: Props) {
         <div className="stat2"><span className="v mono">{Object.values(stats.keys).reduce((a, b) => a + b, 0)}</span><span className="l">Distinct topics</span></div>
         <div className="stat2"><span className={`v mono ${stats.conflicts ? "bad" : ""}`}>{stats.conflicts}</span><span className="l">Conflicts resolved</span></div>
       </section>
+
+      {brain.tiers && (
+        <section className="cards4" aria-label="Memory layers">
+          <div className="scope">
+            <h3>1. Private chats</h3>
+            <p className="small">Raw talk, one file per seller. Only the agent who had the chat reads it.</p>
+            <span className="v mono">{brain.tiers.private_chats}</span> <span className="small muted">conversations</span>
+            <p className="small muted">{brain.tiers.private_writes} private gists in the brain</p>
+          </div>
+          <div className="scope">
+            <h3>2. Shared brain</h3>
+            <p className="small">One result line per deal. Every agent reads it before work.</p>
+            <span className="v mono">{brain.tiers.shared_writes}</span> <span className="small muted">shared writes</span>
+          </div>
+          <div className="scope">
+            <h3>3. Lessons</h3>
+            <p className="small">Distilled by the librarian every 3 deals.</p>
+            {brain.tiers.lessons.length === 0 ? <p className="empty">None yet</p> :
+              brain.tiers.lessons.map((l) => <span key={l} className="small fact-line">{l.replace(/^lesson: /, "")}</span>)}
+          </div>
+          <div className="scope">
+            <h3>Known mistakes</h3>
+            <p className="small">Repeated misses. Top lines go into the negotiator's prompt.</p>
+            {brain.tiers.mistakes.length === 0 ? <p className="empty">None yet</p> :
+              brain.tiers.mistakes.map((m) => <span key={m} className="small fact-line">{m.replace(/^- \d{4}-\d{2}-\d{2} /, "")}</span>)}
+          </div>
+        </section>
+      )}
 
       <section className="cards4" aria-label="What we know">
         {SCOPES.map((s) => {

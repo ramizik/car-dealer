@@ -50,6 +50,9 @@ export type Deal = {
   chat: ChatTurn[];
   drop_reason?: string;
   listing_url?: string;
+  shipping?: number;
+  ship_days?: number;
+  listing?: { title: string; description: string; bullets: string[] };
 };
 
 export type ShiftStatus = {
@@ -84,7 +87,7 @@ export type BrainEntry = {
   facts: Record<string, { value: unknown; confidence: number; source: string; agent: string }>;
   obs: Record<string, { median: number; n: number; sources: string[] }>;
   counters: Record<string, unknown>;
-  notes: { text: string; confidence: number; agent: string }[];
+  notes: { text: string; confidence: number; agent: string; private_to?: string[] }[];
   ts: number;
 };
 
@@ -92,7 +95,15 @@ export type Brain = {
   scopes: Record<"dealer" | "party" | "market" | "playbook", Record<string, BrainEntry>>;
   conflicts: { scope: string; key: string; attr: string; values: string[]; chosen: unknown }[];
   playbook: PlaybookRow[];
+  tiers?: { private_chats: number; shared_writes: number; private_writes: number; lessons: string[]; mistakes: string[] };
   stats: { enabled: boolean; events: number; bytes: number; per_scope: Record<string, number>; keys: Record<string, number>; conflicts: number };
+  tiers?: { private_chats: number; shared_writes: number; private_writes: number; lessons: string[]; mistakes: string[] };
+  last_tidy?: { ts: number; events_before: number; events_after: number; kb_before: number; kb_after: number; applied: boolean; lessons: number } | null;
+};
+
+export type EvalRow = {
+  id: string; persona: string; segment: string; tactic: string; closed: boolean; price: number | null;
+  ask: number; floor: number; rounds: number; dropped: string; scam: boolean; correct: boolean;
 };
 
 export type EvalSide = {
@@ -111,6 +122,8 @@ export type EvalResult = {
   playbook?: PlaybookRow[];
   secs?: number;
   ran_at?: number;
+  rows?: { off: EvalRow[]; on: EvalRow[] };
+  running?: boolean;
 };
 
 export type OnboardingOption = { value: string; label: string; recommended?: boolean };

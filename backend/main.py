@@ -57,8 +57,34 @@ def get_eval():
     if not EVAL_FILE.exists():
         return {"missing": True}
     r = json.loads(EVAL_FILE.read_text(encoding="utf-8"))
-    return {k: r.get(k) for k in ("seed", "train_n", "heldout_n", "off", "on", "train", "playbook", "secs")} | {
-        "ran_at": EVAL_FILE.stat().st_mtime}
+    return {k: r.get(k) for k in ("seed", "train_n", "heldout_n", "off", "on", "train", "playbook", "rows", "secs")} | {
+        "ran_at": EVAL_FILE.stat().st_mtime, "running": _eval_running()}
+
+
+_eval_proc = {"p": None}
+
+
+def _eval_running() -> bool:
+    p = _eval_proc["p"]
+    if p is not None and p.poll() is not None:
+        _eval_proc["p"] = None
+        brain._loaded = False  # eval restored the live brain on disk; re-read it
+    return _eval_proc["p"] is not None
+
+
+@app.post("/eval/run")
+def run_eval():
+    """Re-run the offline eval (~20 s, no API calls) in its own process. Not during a shift: it swaps the brain file."""
+    if swarm.running():
+        return {"started": False, "error": "stop the shift first"}
+    if _eval_running():
+        return {"started": False, "error": "already running"}
+    import subprocess
+    import sys
+    _eval_proc["p"] = subprocess.Popen([sys.executable, "eval.py"], cwd=Path(__file__).parent,
+                                       env={**os.environ, "SIM_FAST": "1"},
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"started": True}
 
 
 class ShiftReq(BaseModel):
@@ -68,6 +94,8 @@ class ShiftReq(BaseModel):
 @app.post("/shift/start")
 async def shift_start(req: ShiftReq = ShiftReq()):
     n = 0 if req.max_deals <= 0 else min(req.max_deals, 20)
+    if _eval_running():
+        return {"started": False, "error": "eval is running, try again in a few seconds"}
     return {"started": swarm.start(n), "continuous": n == 0}
 
 
@@ -150,7 +178,9 @@ def onboarding_questions():
 @app.get("/brain")
 def get_brain():
     v = brain.view()
-    return {**v, "stats": brain.stats(), "playbook": brain.playbook()}
+    tidy = next((e for e in reversed(swarm.EVENTS) if e["agent"] == "librarian" and "compaction" in e["data"]), None)
+    return {**v, "stats": brain.stats(), "playbook": brain.playbook(), "tiers": librarian.tiers(),
+            "last_tidy": tidy and {"ts": tidy["ts"], **tidy["data"]["compaction"], "lessons": len(tidy["data"]["lessons"])}}
 
 
 @app.post("/brain/compact")

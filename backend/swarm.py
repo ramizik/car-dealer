@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import agents
+import conversations
 import librarian
 import memory_layer
 import brain
@@ -80,8 +81,10 @@ def _on_brain(agent: str, kind: str, payload) -> None:
         return
     v = payload.get("value")
     val = v if isinstance(v, str) else ", ".join(f"{k}={x}" for k, x in v.items()) if isinstance(v, dict) else str(v)
-    emit(agent or "librarian", "write", f"{payload.get('scope')} / {payload.get('key')}: {val}"[:200],
+    lock = f"(private to {', '.join(payload['visible_to'])}) " if payload.get("visible_to") else ""
+    emit(agent or "librarian", "write", f"{lock}{payload.get('scope')} / {payload.get('key')}: {val}"[:200],
          {"scope": payload.get("scope"), "key": payload.get("key"), "kind": payload.get("kind"),
+          "private_to": payload.get("visible_to"),
           "confidence": payload.get("confidence"), "deal_id": _state["deal"]})
 
 
@@ -155,12 +158,27 @@ async def _appraise(deal: dict) -> None:
 
 
 async def _sell(deal: dict, buyer: sim.Buyer) -> None:
-    """List at the resale quote, then step down toward the simulated buyer. A walk-away means a discounted sale."""
+    """List at the resale quote, then step down toward the simulated buyer. A walk-away means a discounted sale.
+
+    The buyer chat goes through the same memory layers as the buy side: private log, then one shared artifact."""
     price = int(deal["list_price"])
+    party = f"buyer:{deal['id']}"
     emit("seller", "state", f"Listed {deal['car']} at ${price:,}", {"deal_id": deal["id"], "price": price})
-    sold = None
+    opening = buyer.opening()
+    deal["chat"].append({"from": "buyer", "text": opening})
+    conversations.append(party, "buyer", opening)
+    emit("seller", "message", f"Buyer: {opening}", {"deal_id": deal["id"]})
+    sold, rounds = None, 0
     for _ in range(6):
-        accepted, counter, _ = buyer.step(price)
+        rounds += 1
+        msg = f"It's ${price:,}, inspected and detailed. Can you do that?"
+        deal["chat"].append({"from": "agent", "text": msg, "tactic": "step_down"})
+        conversations.append(party, "agent", msg, tag=f"${price:,}")
+        accepted, counter, text = buyer.step(price)
+        if text:
+            deal["chat"].append({"from": "buyer", "text": text})
+            conversations.append(party, "buyer", text)
+            emit("seller", "message", f"Buyer: {text}", {"deal_id": deal["id"], "counter": counter})
         if accepted:
             sold = price
             break
@@ -174,6 +192,10 @@ async def _sell(deal: dict, buyer: sim.Buyer) -> None:
     emit("seller", "state", f"Sold {deal['car']} for ${deal['sold_for']:,} ({'+' if gain >= 0 else '-'}${abs(gain):,})",
          {"deal_id": deal["id"], "price": deal["sold_for"]})
     seller_agent.record_sale(deal, days=random.Random(deal["id"]).randint(9, 40), sold_for=deal["sold_for"], source=deal["id"])
+    mem = await memory_layer.consolidate("seller", party, deal["id"], {
+        "closed": True, "price": deal["sold_for"], "ask": deal["list_price"], "rounds": rounds,
+        "tactic": "step_down", "segment": getattr(buyer, "persona", "buyer")})
+    emit("seller", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal["id"], **mem})
 
 
 async def approve(deal_id: str, yes: bool, reason: str = "") -> bool:
