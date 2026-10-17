@@ -5,6 +5,59 @@ export const money = (n?: number) => (n === undefined ? "—" : `$${Math.round(n
 export const time = (ts: number) =>
   new Date(ts * 1000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
+// Demo clock: 8 shop hours (8:00 AM–4:00 PM) spread across one shift of real seconds.
+export const SHIFT_HOURS = 8;
+export const SHIFT_SECS_DEFAULT = 300;
+
+export type ShopAnchor = { started: number | null; shift_secs?: number };
+
+export const shopClock = (minutes: number) => {
+  const t = 8 * 60 + Math.max(0, Math.floor(minutes));
+  const hour = Math.floor(t / 60) % 24;
+  const m = t % 60;
+  return `${((hour + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
+};
+
+/** Shop minutes since 8:00 AM, or null when this timestamp is outside the current shift. */
+export function shopMinute(ts: number, shift: ShopAnchor | null | undefined): number | null {
+  const started = shift?.started;
+  const secs = shift?.shift_secs || SHIFT_SECS_DEFAULT;
+  if (started == null || ts < started) return null;
+  const p = Math.min(1, (ts - started) / secs);
+  return Math.floor(p * SHIFT_HOURS * 60);
+}
+
+type Timed = { id: number; ts: number; deal_id?: string | null };
+
+/**
+ * Shop-clock label for each event. Events for one car that land in the same shop minute
+ * each move forward one minute, so a fast deal still reads as a progression through the day.
+ */
+export function shopLabelMap(events: Timed[], shift: ShopAnchor | null | undefined): Map<number, string> {
+  const groups = new Map<string, Timed[]>();
+  for (const e of events) {
+    const key = e.deal_id ?? "";
+    const list = groups.get(key);
+    if (list) list.push(e);
+    else groups.set(key, [e]);
+  }
+  const labels = new Map<number, string>();
+  for (const list of groups.values()) {
+    const ordered = [...list].sort((a, b) => a.ts - b.ts || a.id - b.id);
+    let prev = -1;
+    for (const e of ordered) {
+      const base = shopMinute(e.ts, shift);
+      if (base == null) continue;
+      const mins = Math.max(base, prev + 1);
+      prev = mins;
+      labels.set(e.id, shopClock(mins));
+    }
+  }
+  return labels;
+}
+
+export const eventTime = (e: Timed, labels: Map<number, string>) => labels.get(e.id) ?? time(e.ts);
+
 // Plain-language names for each pipeline state, in order.
 export const STAGES: { state: DealState; label: string }[] = [
   { state: "sourced", label: "Found" },

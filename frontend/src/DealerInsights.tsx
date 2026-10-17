@@ -1,4 +1,4 @@
-import { money, profit, time } from "./format";
+import { eventTime, money, profit, shopLabelMap, type ShopAnchor } from "./format";
 import MoneyView from "./MoneyView";
 import type { AgentEvent, Deal } from "./types";
 
@@ -7,7 +7,7 @@ import type { AgentEvent, Deal } from "./types";
 const BOUGHT = ["bought", "in_transit", "delivered", "listed", "awaiting_sale", "sold"];
 const ON_LOT = ["delivered", "listed", "awaiting_sale"];
 
-export default function DealerInsights({ deals, events }: { deals: Deal[]; events: AgentEvent[] }) {
+export default function DealerInsights({ deals, events, shift }: { deals: Deal[]; events: AgentEvent[]; shift?: ShopAnchor | null }) {
   const bought = deals.filter((d) => BOUGHT.includes(d.state));
   const sold = deals.filter((d) => d.state === "sold");
   const waiting = deals.filter((d) => d.state === "awaiting_approval" || d.state === "awaiting_sale").length;
@@ -17,6 +17,7 @@ export default function DealerInsights({ deals, events }: { deals: Deal[]; event
   const stopped = deals.filter((d) => d.state === "dropped").length;
 
   // Plain-language log of what the team did, newest first. Chat lines are left out.
+  const times = shopLabelMap(events, shift);
   const activity = events.filter((e) => ["state", "approval", "blocked"].includes(e.type)).slice(-25).reverse();
 
   const stats: [string, string | number][] = [
@@ -54,7 +55,7 @@ export default function DealerInsights({ deals, events }: { deals: Deal[]; event
           <ul className="log panel">
             {activity.map((e) => (
               <li key={e.id}>
-                <span className="who">{time(e.ts)}</span>
+                <span className="who">{eventTime(e, times)}</span>
                 {e.text}
               </li>
             ))}

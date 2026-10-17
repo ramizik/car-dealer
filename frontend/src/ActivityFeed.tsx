@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { time } from "./format";
+import { eventTime, shopLabelMap, type ShopAnchor } from "./format";
 import type { AgentEvent } from "./types";
 import { CHANNEL_LABELS } from "./channels";
 
-type Props = { events: AgentEvent[]; onOpen: (dealId: string) => void; limit?: number };
+type Props = { events: AgentEvent[]; onOpen: (dealId: string) => void; limit?: number; shift?: ShopAnchor | null };
 
 const isAttention = (e: AgentEvent) => e.type === "blocked" || e.type === "approval" || e.type === "error";
 
 // Newest first. "Needs attention" hides routine steps so problems are easy to spot.
-export default function ActivityFeed({ events, onOpen, limit }: Props) {
+export default function ActivityFeed({ events, onOpen, limit, shift }: Props) {
   const [onlyAttention, setOnlyAttention] = useState(false);
+  const times = shopLabelMap(events, shift);
   const all = [...events].reverse().filter((e) => e.type !== "recall" && e.type !== "write");  // hide internal steps
   const shown = (onlyAttention ? all.filter(isAttention) : all).slice(0, limit);
 
@@ -29,7 +30,7 @@ export default function ActivityFeed({ events, onOpen, limit }: Props) {
         {shown.map((e) => (
           <li key={e.id} className={e.type === "blocked" ? "blocked" : e.type === "approval" ? "attn" : ""}>
             <span className="who">
-              {time(e.ts)}
+              {eventTime(e, times)}
               {e.type === "blocked" && " · Blocked"}
               {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
             </span>

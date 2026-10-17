@@ -62,7 +62,7 @@ export default function AdminMemory() {
           <div className="stat"><span className="value">{data.agents.shift_phase}</span><span className="label">Shift phase</span></div>
         </div>
         <table className="list">
-          <thead><tr><th>Name (demo)</th><th>Role</th><th>Status</th><th>Last activity</th><th>Memory writes</th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last activity</th><th>Memory writes</th></tr></thead>
           <tbody>
             {data.agents.agents.map((a) => (
               <tr key={a.name}>
@@ -75,7 +75,7 @@ export default function AdminMemory() {
             ))}
           </tbody>
         </table>
-        <p className="small muted">Names are demo labels. "Working" means the agent logged something in the last two minutes or the shift is in its phase. Agents only act while a shift runs.</p>
+        <p className="small muted">"Working" means the agent logged something in the last two minutes or the shift is in its phase. Agents only act while a shift runs.</p>
       </section>
 
       <section className="stack-sm" aria-labelledby="cost-head">
@@ -122,7 +122,7 @@ export default function AdminMemory() {
           <div className="stat"><span className="value">{data.youcom.calls}</span><span className="label">Live searches</span></div>
           <div className="stat"><span className="value">{pct(cacheShare)}</span><span className="label">Searches answered from cache</span></div>
         </div>
-        <p className="small muted">{data.youcom.demo_mode ? "Demo mode: searches read the cache, no live calls." : "Live mode."}</p>
+        <p className="small muted">{data.youcom.demo_mode ? "Searches read the cache. No live calls." : "Live searches."}</p>
       </section>
     </main>
   );

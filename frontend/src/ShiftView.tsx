@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import ActivityFeed from "./ActivityFeed";
-import { agentName, COLUMNS, keyNumber, money, stageLabel, time } from "./format";
+import { agentName, COLUMNS, eventTime, keyNumber, money, shopClock, shopLabelMap, stageLabel } from "./format";
 import { needsYou, nowFor } from "./status";
 import type { AgentEvent, Brain, Deal, DealState, EvalResult, Health } from "./types";
 
@@ -30,12 +30,6 @@ const PLAN: { title: string; text: string }[] = [
   { title: "A full shop day in minutes", text: "8 shop hours are compressed into about 5 minutes. You can stop at any time." },
 ];
 
-const shopClock = (minutes: number) => {
-  const t = 8 * 60 + Math.max(0, Math.floor(minutes));
-  const h = Math.floor(t / 60);
-  const m = t % 60;
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-};
 const working = (d: Deal) => d.state === "sourced" || d.state === "appraised" || d.state === "negotiating";
 
 const clock = (secs: number) => {
@@ -64,6 +58,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
   const inShift = (e: AgentEvent) => !started || e.ts >= started;
   const shiftEvents = events.filter(inShift);
 
+  const times = shopLabelMap(events, shift);
   const writes = shiftEvents.filter((e) => e.type === "write");
   const recalls = shiftEvents.filter((e) => e.type === "recall");
 
@@ -225,7 +220,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
             <h2 id="decisions">Team decisions</h2>
             <span className="muted small">what it chose on its own</span>
           </div>
-          <Log items={decisions} empty="Tactic picks, buys, drops and your answers show up here." onOpen={onOpen} render={decisionText} />
+          <Log items={decisions} empty="Tactic picks, buys, drops and your answers show up here." onOpen={onOpen} render={decisionText} times={times} />
         </section>
 
         {/* Findings: what scouting, valuing and the sales desk found out. */}
@@ -234,7 +229,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
             <h2 id="findings">Findings</h2>
             <span className="muted small">market, value, resale, red flags</span>
           </div>
-          <Log items={findings} empty="Market scans, valuations and resale quotes show up here." onOpen={onOpen} render={(e) => e.text} />
+          <Log items={findings} empty="Market scans, valuations and resale quotes show up here." onOpen={onOpen} render={(e) => e.text} times={times} />
         </section>
       </div>
 
@@ -261,7 +256,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
                     <strong>{String(e.data.key)}</strong>
                     <span className="muted small">{e.text.split(": ").slice(1).join(": ")}</span>
                   </span>
-                  <span className="muted small mono">{agentName(e.agent)} {time(e.ts)}</span>
+                  <span className="muted small mono">{agentName(e.agent)} {eventTime(e, times)}</span>
                 </li>
               ))}
             </ol>
@@ -269,7 +264,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
           <Learning result={evalResult} onMore={onInsights} />
         </section>
 
-        <ActivityFeed events={events} onOpen={onOpen} limit={14} />
+        <ActivityFeed events={events} onOpen={onOpen} limit={14} shift={shift} />
       </div>
     </div>
   );
@@ -280,13 +275,13 @@ const decisionText = (e: AgentEvent) =>
     ? `Chose tactic "${e.text.split("tactic=")[1]?.replace(/_/g, " ")}" for a ${e.text.split(",")[0].slice(8).replace(/_/g, " ")} seller`
     : e.text;
 
-function Log({ items, empty, onOpen, render }: { items: AgentEvent[]; empty: string; onOpen: (id: string) => void; render: (e: AgentEvent) => string }) {
+function Log({ items, empty, onOpen, render, times }: { items: AgentEvent[]; empty: string; onOpen: (id: string) => void; render: (e: AgentEvent) => string; times: Map<number, string> }) {
   if (items.length === 0) return <p className="empty">{empty}</p>;
   return (
     <ol className="log">
       {items.slice(0, 10).map((e) => (
         <li key={e.id} className={e.type === "blocked" ? "blocked" : e.type === "approval" ? "attn" : ""}>
-          <span className="who mono">{time(e.ts)} {agentName(e.agent)}</span>
+          <span className="who mono">{eventTime(e, times)} {agentName(e.agent)}</span>
           {e.deal_id ? <button className="feed-link" onClick={() => onOpen(e.deal_id!)}>{render(e)}</button> : <span>{render(e)}</span>}
         </li>
       ))}

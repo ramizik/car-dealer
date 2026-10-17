@@ -71,7 +71,7 @@ export default function App() {
 
   const startShift = async () => {
     await api.startDemo();
-    setToast("Demo started: a full shop day");
+    setToast("Shift started");
     refresh();
   };
   const stopShift = async () => {
@@ -206,10 +206,10 @@ export default function App() {
         <div className="team-card">
           <span className={`status ${running ? "on" : ""}`} role="status">
             <i aria-hidden="true" />
-            {running ? `Demo running · ${health?.shift?.n ?? 0} cars` : "Demo not running"}
+            {running ? `On shift · ${health?.shift?.n ?? 0} cars` : "No shift running"}
           </span>
           <button className={running ? "" : "primary"} onClick={toggleShift} disabled={!health}>
-            {running ? "Stop demo" : "Start Demo"}
+            {running ? "End shift" : "Start shift"}
           </button>
         </div>
       </aside>
@@ -280,7 +280,7 @@ export default function App() {
                 <h1>Insights</h1>
                 <p>What the team did for you, what it earned, and what is waiting for your decision.</p>
               </header>
-              <DealerInsights deals={deals} events={events} />
+              <DealerInsights deals={deals} events={events} shift={health?.shift} />
             </div>
           )}
           {section === "setup" && (
@@ -306,7 +306,7 @@ export default function App() {
         ))}
       </nav>
 
-      {open && <DealPanel deal={open} events={events} onClose={() => setOpenId(null)} onDecide={decide} onSale={saleDecide} />}
+      {open && <DealPanel deal={open} events={events} shift={health?.shift} onClose={() => setOpenId(null)} onDecide={decide} onSale={saleDecide} />}
 
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
     </div>
