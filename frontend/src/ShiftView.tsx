@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import ActivityFeed from "./ActivityFeed";
-import { agentName, money, profit, time } from "./format";
+import { agentName, COLUMNS, keyNumber, money, stageLabel, time } from "./format";
 import { needsYou, nowFor } from "./status";
 import type { AgentEvent, Brain, Deal, DealState, EvalResult, Health } from "./types";
 
@@ -36,6 +36,7 @@ const PLAN: { title: string; text: string }[] = [
   { title: "Finds cars all day", text: "The scout scans the market for cars that fit your setup and keeps looking as the shift goes on." },
   { title: "Works several deals at once", text: "Up to 4 cars at a time: value it, call the seller, negotiate. New cars arrive while others are in progress." },
   { title: "Asks you only when it must", text: "Clear wins are bought and sold automatically. Borderline buys and sales wait for your OK, and one seller phones in live for you to answer by voice or text." },
+  { title: "Sells at the same time", text: "A few cars are already on the lot when the shift opens, so buyers start sending offers right away. Good prices sell on their own; low ones ask you." },
   { title: "Handles everything after the buy", text: "Shipping, the storefront listing and buyer talks run in the background until the car is sold." },
   { title: "Learns as it goes", text: "Every deal writes what worked to the shared brain, so later cars start smarter." },
   { title: "A full shop day in minutes", text: "8 shop hours are compressed into about 5 minutes. You can stop at any time." },
@@ -57,8 +58,6 @@ const clock = (secs: number) => {
   return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${pad(m)}:${pad(s % 60)}`;
 };
 
-const pct = (n: number) => `${Math.round(n * 1000) / 10}%`;
-
 function useNow() {
   const [now, setNow] = useState(() => Date.now() / 1000);
   useEffect(() => {
@@ -77,20 +76,9 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
   const inShift = (e: AgentEvent) => !started || e.ts >= started;
   const shiftEvents = events.filter(inShift);
 
-  // Stats, all derived from live deals and events.
-  const closedDeals = deals.filter((d) => d.offer !== undefined);
-  const settled = deals.filter((d) => d.state !== "sourced" && d.state !== "appraised" && d.state !== "negotiating");
-  const sold = deals.filter((d) => d.state === "sold");
-  const earned = sold.reduce((s, d) => s + (profit(d) ?? 0), 0);
-  const offAsk = closedDeals.length
-    ? closedDeals.reduce((s, d) => s + (d.asking - (d.offer ?? d.asking)) / d.asking, 0) / closedDeals.length
-    : null;
-  const blocked = shiftEvents.filter((e) => e.type === "blocked").length;
   const writes = shiftEvents.filter((e) => e.type === "write");
   const recalls = shiftEvents.filter((e) => e.type === "recall");
-  const llmCalls = Object.values(health?.llm ?? {}).reduce((s, t) => s + (t.calls ?? 0), 0);
 
-  const approvals = deals.filter((d) => d.state === "awaiting_approval" || d.state === "awaiting_sale");
   const inProgress = deals.filter(working);
   const waiting = deals.filter(needsYou);
   const last = events[events.length - 1];
@@ -164,34 +152,47 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
         </div>
       </section>
 
-      {/* Needs you: every deal waiting on a person, with the one action. Empty when the team is working alone. */}
-      {waiting.length > 0 && (
-        <section className="needs-you" aria-labelledby="needs-you-title">
-          <h2 id="needs-you-title">Needs you ({waiting.length})</h2>
+      {/* Needs you: only things a person must do, each with its own button. Everything else is on the board below. */}
+      <section className={`needs-you ${waiting.length ? "" : "calm"}`} aria-labelledby="needs-you-title">
+        <h2 id="needs-you-title">Needs you ({waiting.length})</h2>
+        {waiting.length === 0 ? (
+          <p className="small muted">Nothing to decide right now. The team is working; clear wins are handled automatically.</p>
+        ) : (
           <ul>
             {waiting.map((d) => {
-              const now = nowFor(d);
+              const n = nowFor(d);
+              const name = d.car.split(" · ")[0];
+              const kind = n.action === "seller" ? "Live call" : n.action === "sale" ? "Sell offer" : "Buy offer";
               return (
-                <li key={d.id}>
-                  <button className="needs-row" onClick={() => onOpen(d.id)}>
-                    <span className="turn-pill">{now.action === "seller" ? "YOUR TURN" : "YOUR OK"}</span>
-                    <span>
-                      <strong>{d.car.split(" · ")[0]}</strong> <span className="muted small">{d.id}</span>
-                      <span className="small">{now.title}. {now.detail}</span>
+                <li key={d.id} className="need">
+                  <span className={`kind k-${n.action}`}>{kind}</span>
+                  <span className="need-main">
+                    <strong>{name}</strong> <span className="muted small">{d.id}</span>
+                    <span className="small">
+                      {n.action === "sale"
+                        ? `A buyer will pay ${money(d.sale_offer)} (listed ${money(d.list_price)}, paid ${money(d.bought_for)}).`
+                        : n.action === "approve"
+                          ? `Seller agreed ${money(d.offer)} (asked ${money(d.asking)}, your max ${money(d.max_buy)}).`
+                          : "A seller is on the line. Answer by voice or text."}
                     </span>
-                    <span className="needs-open">Open</span>
-                  </button>
+                  </span>
+                  <span className="actions">
+                    {n.action === "approve" && (<><button onClick={() => onDecide(d.id, false)}>Decline</button><button className="primary" onClick={() => onDecide(d.id, true)}>Buy</button></>)}
+                    {n.action === "sale" && (<><button onClick={() => onSale(d.id, false)}>Keep talking</button><button className="primary" onClick={() => onSale(d.id, true)}>Sell</button></>)}
+                    {n.action === "seller" && <button className="primary" onClick={() => onOpen(d.id)}>Take the call</button>}
+                    {n.action !== "seller" && <button className="quiet" onClick={() => onOpen(d.id)}>Details</button>}
+                  </span>
                 </li>
               );
             })}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Pipeline: how many deals sit at each step, then every deal on its own track. */}
       <section className="panel" aria-labelledby="pipeline">
         <div className="panel-head">
-          <h2 id="pipeline">Progress</h2>
+          <h2 id="pipeline">Deal board</h2>
           <span className="muted small">{deals.length} deals · {deals.filter((d) => d.state === "dropped").length} stopped · <a href={api.storefrontUrl} target="_blank" rel="noreferrer">Storefront</a></span>
         </div>
         <ol className="stepper">
@@ -209,85 +210,47 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
         {deals.length === 0 ? (
           <p className="empty">No deals yet. Press Start Demo and each car appears here as it moves through the steps.</p>
         ) : (
-          <ul className="tracks">
-            {deals.slice(0, 10).map((d) => {
-              const stopped = d.state === "dropped";
-              // A stopped deal shows the step it stopped at: it talked to the seller if there is a chat.
-              const at = stopped ? (d.chat.length ? 2 : 1) : stepOf(d.state);
-              const mine = events.filter((e) => e.deal_id === d.id);
-              const first = mine[0];
-              const lastE = mine[mine.length - 1];
-              const said = [...mine].reverse().find((e) => !["recall", "write", "skill"].includes(e.type));
+          <div className="lanes">
+            {[...COLUMNS, { title: "Stopped", hint: "Walked away, scams, over budget", states: ["dropped" as DealState] }].map((col) => {
+              const rows = deals.filter((d) => col.states.includes(d.state));
               return (
-                <li key={d.id}>
-                  <button className="track" onClick={() => onOpen(d.id)}>
-                    <span className="track-car">
-                      <strong>{d.car.split(" · ")[0]}</strong>
-                      <span className="muted small">{d.id} · {stopped ? `Stopped: ${d.drop_reason}` : said?.text ?? ""}</span>
-                    </span>
-                    <span className={`track-bar ${stopped ? "stopped" : ""}`} aria-label={stopped ? "Stopped" : STEPS[at]?.label}>
-                      {STEPS.map((s, i) => (
-                        <i key={s.label} className={i < at ? "done" : i === at ? (stopped ? "stop" : running && working(d) ? "now" : "here") : ""} />
-                      ))}
-                    </span>
-                    <span className="mono small muted track-t">
-                      {first && lastE ? clock((running && working(d) ? now : lastE.ts) - first.ts) : ""}
-                    </span>
-                  </button>
-                </li>
+                <section key={col.title} className="lane" aria-label={col.title}>
+                  <header><h3>{col.title}</h3><span className="lane-n mono">{rows.length}</span></header>
+                  <p className="small muted">{col.hint}</p>
+                  <ul>
+                    {rows.slice(0, 8).map((d) => {
+                      const mine = events.filter((e) => e.deal_id === d.id);
+                      const said = [...mine].reverse().find((e) => !["recall", "write", "skill"].includes(e.type));
+                      const asks = needsYou(d);
+                      return (
+                        <li key={d.id}>
+                          <button className={`card ${asks ? "asks" : ""} ${running && working(d) ? "busy" : ""}`} onClick={() => onOpen(d.id)}>
+                            <span className="card-top">
+                              <strong>{d.car.split(" · ")[0]}</strong>
+                              <span className="muted small mono">{d.id}</span>
+                            </span>
+                            <span className="small card-step">{asks ? "Needs you" : d.state === "dropped" ? `Stopped: ${d.drop_reason}` : stageLabel(d.state)}</span>
+                            <span className="small muted">{d.state === "dropped" ? "" : keyNumber(d)}</span>
+                            {said && d.state !== "dropped" && <span className="small muted card-said">{said.text}</span>}
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {rows.length === 0 && <li className="small muted lane-empty">None</li>}
+                  </ul>
+                </section>
               );
             })}
-          </ul>
+          </div>
         )}
-      </section>
-
-      {/* Stats: before/after numbers a judge can check against the feed. */}
-      <section className="stats" aria-label="Shift stats">
-        <Stat value={String(deals.length)} label="Deals worked" />
-        <Stat value={settled.length ? pct(closedDeals.length / settled.length) : "-"} label="Close rate" />
-        <Stat value={offAsk === null ? "-" : pct(offAsk)} label="Saved off asking" />
-        <Stat value={money(earned)} label={`Profit, ${sold.length} sold`} tone={earned > 0 ? "good" : undefined} />
-        <Stat value={String(blocked)} label="Scams blocked" />
-        <Stat value={String(recalls.length)} label="Memory reads" />
-        <Stat value={String(writes.length)} label="Memory writes" />
-        <Stat value={String(llmCalls)} label={health?.llm_live ? "Nemotron calls" : "LLM calls (mock)"} />
       </section>
 
       <div className="two-col">
         {/* Decisions: what needs the owner, then what the team decided on its own. */}
         <section className="panel" aria-labelledby="decisions">
           <div className="panel-head">
-            <h2 id="decisions">Decisions</h2>
-            {approvals.length > 0 && <span className="tag attn">{approvals.length} need you</span>}
-          </div>
-          <div className="stack-sm">
-            {approvals.map((d) => d.state === "awaiting_sale" ? (
-              <article key={d.id} className="ask">
-                <div>
-                  <strong>Sell {d.car.split(" · ")[0]} for {money(d.sale_offer)}?</strong>
-                  <p className="small muted">A buyer accepted this price. Nothing sells until you say yes. Listed at {money(d.list_price)}.</p>
-                </div>
-                <div className="actions">
-                  <button onClick={() => onSale(d.id, false)}>Keep talking</button>
-                  <button className="primary" onClick={() => onSale(d.id, true)}>Sell</button>
-                </div>
-              </article>
-            ) : (
-              <article key={d.id} className="ask">
-                <div>
-                  <strong>Buy {d.car.split(" · ")[0]} for {money(d.offer)}?</strong>
-                  <p className="small muted">
-                    Asked {money(d.asking)} · your max {money(d.max_buy)}
-                    {d.max_profit !== undefined && <> · profit at max <span className={d.max_profit >= 0 ? "good" : "bad"}>{money(d.max_profit)}</span></>}
-                    {d.valuation && <> · worth about {money(d.valuation.mid)}</>}
-                  </p>
-                </div>
-                <div className="actions">
-                  <button onClick={() => onDecide(d.id, false)}>Decline</button>
-                  <button className="primary" onClick={() => onDecide(d.id, true)}>Approve</button>
-                </div>
-              </article>
-            ))}
+            <h2 id="decisions">Team decisions</h2>
+            <span className="muted small">what it chose on its own</span>
           </div>
           <Log items={decisions} empty="Tactic picks, buys, drops and your answers show up here." onOpen={onOpen} render={decisionText} />
         </section>
@@ -335,15 +298,6 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
 
         <ActivityFeed events={events} onOpen={onOpen} limit={14} />
       </div>
-    </div>
-  );
-}
-
-function Stat({ value, label, tone }: { value: string; label: string; tone?: "good" }) {
-  return (
-    <div className="stat2">
-      <span className={`v mono ${tone ?? ""}`}>{value}</span>
-      <span className="l">{label}</span>
     </div>
   );
 }

@@ -500,6 +500,28 @@ async def _pipeline(sc: dict, live_call: bool, done: list) -> None:
         save()
 
 
+LOT_CARS = 3  # cars already on the lot when the shift opens, so buyer offers start coming in within seconds
+
+
+def _seed_lot() -> None:
+    """Morning stock: cars already bought and listed. Buyers send offers on them from the first seconds, so the
+    sell side runs next to the buy side. Each goes through the same _sell path as a car the team bought."""
+    batch = sim.scenarios(_state["seed"] + 500, 12)
+    for sc in (batch["train"] + batch["heldout"])[:LOT_CARS]:
+        ask = sc["seller"]["ask"]
+        _state["n"] += 1
+        deal_id = f"D-{200 + _state['n']}"
+        paid = round(ask * random.Random(deal_id).uniform(0.6, 0.88), -2)
+        deal = {"id": deal_id, "car": _title(sc["listing"]), "location": sc["listing"].get("city", ""), "state": "listed",
+                "asking": ask, "max_buy": round(paid), "listing_url": sc["listing"].get("url"), "chat": [], "turn": None,
+                "valuation": {"low": round(ask * 0.95), "mid": ask, "high": round(ask * 1.1), "citations": []},
+                "bought_for": int(paid), "shipping": 0, "list_price": int(round(ask * 1.12, -1)), "on_lot": True}
+        deal["listing"] = ops._template_listing(deal)
+        DEALS[deal_id], _SC[deal_id] = deal, sc
+        emit("seller", "state", f"On the lot from yesterday: {deal['car']}, listed at ${deal['list_price']:,}", {"deal_id": deal_id})
+        _spawn(deal)
+
+
 async def _workday() -> None:
     """The shift: scout, then keep PARALLEL cars in negotiation at once until the shop clock runs out."""
     try:
@@ -507,6 +529,7 @@ async def _workday() -> None:
         _state["started"], _state["ended"] = time.time(), None
         end_at = _state["started"] + SHIFT_SECS
         emit("system", "state", f"Shift started: {SHIFT_HOURS} shop hours, up to {PARALLEL} cars at once", {})
+        _seed_lot()
         queue: list[dict] = []
         pipes: set = set()
         done: list = []
