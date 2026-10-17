@@ -292,9 +292,10 @@ async def _one(i: int, sc: dict) -> None:
     listing = sc["listing"]
     deal_id = f"D-{200 + i}"
     comps = round(sc["seller"]["ask"] * random.Random(sc["id"]).uniform(1.05, 1.22), -2)
-    max_buy = sc["seller"]["ask"] * 1.0
-    if max_buy > dealer_profile.get()["buy_limit"]:
-        return False  # over the dealer's spend limit, not worth a deal row
+    # Ceiling = resale estimate - recon - dealer's minimum profit, capped by ask and buy limit.
+    max_buy = min(sc["seller"]["ask"], dealer_profile.get()["buy_limit"], comps - seller_agent.RECON - seller_agent.min_profit())
+    if max_buy <= 0:
+        return False  # no profit possible at any price, not worth a deal row
     # Live shift: the first deal's seller is a person answering in the browser; the rest are simulated.
     is_live = bool(_state["live"]) and not _state["live_done"]
     if is_live:
