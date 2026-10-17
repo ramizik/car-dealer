@@ -14,6 +14,18 @@ QUESTIONS = [
         ],
     },
     {
+        "id": "car_segments",
+        "ask": "What kind of cars do you deal in?",
+        "type": "multi",
+        "options": [
+            {"value": "premium", "label": "Premium (BMW, Mercedes, Audi, Lexus)"},
+            {"value": "supercars", "label": "Supercars and sports cars"},
+            {"value": "normal", "label": "Everyday cars (Civic, Corolla, Camry)", "recommended": True},
+            {"value": "family", "label": "Family cars and SUVs (minivans, 3-row SUVs)"},
+            {"value": "all", "label": "All of them"},
+        ],
+    },
+    {
         "id": "sell_channels",
         "ask": "Where should we list your cars for sale?",
         "type": "multi",

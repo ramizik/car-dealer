@@ -13,14 +13,15 @@
 ## Questions (keep in sync with `backend/onboarding.py`)
 
 1. Dealership type: independent lot, franchise, wholesale only.
-2. Where to list for sale: our website (default), Facebook Marketplace, Craigslist, Autotrader.
-3. Car types to buy: trucks, SUVs, sedans, electric, anything (default).
-4. Price range: under $15k, $15k to $30k (default), $30k to $45k, over $45k.
-5. Highest mileage: under 80k, under 120k (default), any.
-6. Titles: clean only (default), or rebuilt too but ask first.
-7. Auctions: ask before each bid (default), bid automatically within max, or no auctions.
-8. Who approves: me by text (default), me in this dashboard, my manager.
-9. Adding cars: add later (default), upload a spreadsheet, send a list by text.
+2. Car segments: premium, supercars, everyday (default), family and SUVs, or all of them.
+3. Where to list for sale: our website (default), Facebook Marketplace, Craigslist, Autotrader.
+4. Car types to buy: trucks, SUVs, sedans, electric, anything (default).
+5. Price range: under $15k, $15k to $30k (default), $30k to $45k, over $45k.
+6. Highest mileage: under 80k, under 120k (default), any.
+7. Titles: clean only (default), or rebuilt too but ask first.
+8. Auctions: ask before each bid (default), bid automatically within max, or no auctions.
+9. Who approves: me by text (default), me in this dashboard, my manager.
+10. Adding cars: add later (default), upload a spreadsheet, send a list by text.
 
 Then: approver phone number (only if they chose "me by text") and one authority tick: "Let the team list and bid within these choices."
 
