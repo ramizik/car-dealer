@@ -59,6 +59,9 @@ async def read_answer(text: str, offer: int) -> tuple[bool, int | None]:
         accepted, walked = bool(v.get("accepted")), bool(v.get("walked_away"))
         counter = v.get("counter")
         counter = int(counter) if isinstance(counter, (int, float)) and counter > 0 else None
+    # A price above our offer is a counter, not a walk-away, even if the model said otherwise.
+    if counter is not None and counter > offer:
+        accepted, walked = False, False
     if accepted:
         return True, None
     if walked:
