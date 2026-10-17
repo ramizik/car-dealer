@@ -6,6 +6,7 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+import brain  # noqa: E402
 import loop  # noqa: E402
 import memory  # noqa: E402
 
@@ -30,3 +31,17 @@ async def run(req: RunReq):
 @app.get("/memory")
 def get_memory():
     return memory.load()
+
+
+@app.get("/brain")
+def get_brain():
+    v = brain.view()
+    return {**v, "stats": brain.stats(), "playbook": brain.playbook()}
+
+
+@app.post("/brain/load/{name}")
+def load_brain(name: str):
+    try:
+        return {"events": brain.load(name)}
+    except FileNotFoundError as e:
+        return {"error": str(e)}
