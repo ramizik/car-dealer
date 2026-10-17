@@ -63,13 +63,15 @@ async def _rewrite(template: str, role: str) -> str:
         import llm
         out = await llm.chat(
             f"You are a {role} texting about a used car. Rewrite the message casually in 1-2 sentences. "
-            "Keep every number and URL exactly as written. Use no other numbers: do not suggest a middle price.",
+            "Keep every number and URL exactly as written. Never state any other price, including a middle or split price.",
             template, temperature=0.7, tier="sim", max_tokens=1024)
         money = lambda t: {int(m.replace(",", "")) for m in re.findall(r"\$\s?([\d,]+)", t)}
         urls = re.findall(r"https?://\S+", template)
-        # Same prices as the template, no invented ones (the deterministic counter is the only real number).
-        if out and money(out) == money(template) and all(u in out for u in urls):
-            return out.strip()
+        real = money(template)
+        # Drop any sentence with an invented price (the model likes "meet in the middle at $X"); keep the rest.
+        kept = " ".join(p for p in re.split(r"(?<=[.!?])\s+", (out or "").strip()) if money(p) <= real)
+        if kept and money(kept) == real and all(u in kept for u in urls):
+            return kept
     except Exception:
         pass
     return template
