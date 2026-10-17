@@ -37,6 +37,7 @@ EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
 _state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
           "phase": "idle", "deal": None, "continuous": False, "live": False, "live_done": False}
+_sim_prev: dict[str, int] = {}  # deal id -> last shop minute stamped, so a fast deal still moves forward
 SHIFT_SECS = float(os.getenv("DEMO_SHIFT_SECS", "300"))  # real seconds that stand for one 8-hour shop day
 SHIFT_HOURS = 8
 PARALLEL = int(os.getenv("DEMO_PARALLEL", "4"))  # cars negotiated at the same time
@@ -74,15 +75,37 @@ def _restore() -> None:
         deal["turn"] = None
         if deal["state"] in ("sourced", "appraised", "negotiating"):
             deal.update(state="dropped", drop_reason="backend restarted mid-negotiation")
+    for e in EVENTS:
+        if e.get("deal_id") and isinstance(e.get("sim_min"), int):
+            _sim_prev[e["deal_id"]] = max(_sim_prev.get(e["deal_id"], -1), e["sim_min"])
 
 
 _restore()
 
 
+def _shop_minute(ts: float) -> int | None:
+    """Shop minutes since 8:00 AM. None when no shift is open."""
+    if not _state["started"]:
+        return None
+    p = min(1.0, max(0.0, (ts - _state["started"]) / SHIFT_SECS))
+    return int(p * SHIFT_HOURS * 60)
+
+
 def emit(agent: str, type_: str, text: str, data: dict | None = None) -> None:
     data = data or {}
-    EVENTS.append({"id": len(EVENTS) + 1, "ts": time.time(), "deal_id": data.get("deal_id"), "agent": agent,
-                   "type": type_, "text": text, "data": data})
+    ts = time.time()
+    row = {"id": len(EVENTS) + 1, "ts": ts, "deal_id": data.get("deal_id"), "agent": agent,
+           "type": type_, "text": text, "data": data}
+    sim = _shop_minute(ts)
+    if sim is not None and row["deal_id"]:
+        prev = _sim_prev.get(row["deal_id"], -1)
+        if sim <= prev:
+            sim = prev + 1
+        _sim_prev[row["deal_id"]] = sim
+        row["sim_min"] = sim
+    elif sim is not None:
+        row["sim_min"] = sim
+    EVENTS.append(row)
 
 
 # Demo names for the admin page. "emits" are the names the agents use in the event feed and memory.
@@ -529,6 +552,7 @@ async def _workday() -> None:
     """The shift: scout, then keep PARALLEL cars in negotiation at once until the shop clock runs out."""
     try:
         _state["continuous"], _state["cap"] = False, 0
+        _sim_prev.clear()
         _state["started"], _state["ended"] = time.time(), None
         end_at = _state["started"] + SHIFT_SECS
         emit("system", "state", f"Shift started: {SHIFT_HOURS} shop hours, up to {PARALLEL} cars at once", {})

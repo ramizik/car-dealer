@@ -18,22 +18,15 @@ export const shopClock = (minutes: number) => {
   return `${((hour + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
 };
 
-/** Shop minutes since 8:00 AM, or null when this timestamp is outside the current shift. */
-export function shopMinute(ts: number, shift: ShopAnchor | null | undefined): number | null {
-  const started = shift?.started;
-  const secs = shift?.shift_secs || SHIFT_SECS_DEFAULT;
-  if (started == null || ts < started) return null;
-  const p = Math.min(1, (ts - started) / secs);
-  return Math.floor(p * SHIFT_HOURS * 60);
-}
-
-type Timed = { id: number; ts: number; deal_id?: string | null };
+type Timed = { id: number; ts: number; deal_id?: string | null; text?: string; sim_min?: number };
 
 /**
- * Shop-clock label for each event. Events for one car that land in the same shop minute
- * each move forward one minute, so a fast deal still reads as a progression through the day.
+ * Shop-clock label for each event. The minute comes from the demo clock (8 shop hours over one
+ * shift). Steps on the same car that land in one shop minute each move forward one minute,
+ * so a deal that finishes in under a second still reads as a progression through the morning.
  */
 export function shopLabelMap(events: Timed[], shift: ShopAnchor | null | undefined): Map<number, string> {
+  const opens = events.filter((e) => e.text?.startsWith("Shift started")).map((e) => e.ts).sort((a, b) => a - b);
   const groups = new Map<string, Timed[]>();
   for (const e of events) {
     const key = e.deal_id ?? "";
@@ -41,15 +34,31 @@ export function shopLabelMap(events: Timed[], shift: ShopAnchor | null | undefin
     if (list) list.push(e);
     else groups.set(key, [e]);
   }
+  const secs = shift?.shift_secs || SHIFT_SECS_DEFAULT;
+  const openedAt = (ts: number) => {
+    let opened: number | null = null;
+    for (const s of opens) {
+      if (s <= ts) opened = s;
+      else break;
+    }
+    if (opened == null && shift?.started != null && ts >= shift.started) opened = shift.started;
+    return opened;
+  };
   const labels = new Map<number, string>();
-  for (const list of groups.values()) {
+  for (const [key, list] of groups) {
     const ordered = [...list].sort((a, b) => a.ts - b.ts || a.id - b.id);
     let prev = -1;
     for (const e of ordered) {
-      const base = shopMinute(e.ts, shift);
-      if (base == null) continue;
-      const mins = Math.max(base, prev + 1);
-      prev = mins;
+      let base = typeof e.sim_min === "number" ? e.sim_min : null;
+      if (base == null) {
+        const opened = openedAt(e.ts);
+        if (opened == null) continue;
+        const p = Math.min(1, Math.max(0, (e.ts - opened) / secs));
+        base = Math.floor(p * SHIFT_HOURS * 60);
+      }
+      // Only a car's own history is forced forward. Shared scout lines keep the raw shop minute.
+      const mins = key ? Math.max(base, prev + 1) : base;
+      if (key) prev = mins;
       labels.set(e.id, shopClock(mins));
     }
   }

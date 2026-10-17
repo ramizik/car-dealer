@@ -22,6 +22,7 @@ export type AgentEvent = {
   agent: string;
   type: EventType;
   text: string;
+  sim_min?: number; // shop minutes since 8:00 AM, stamped while a shift is running
   data: Record<string, unknown>;
   model?: string;
 };

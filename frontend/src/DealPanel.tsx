@@ -21,7 +21,8 @@ export default function DealPanel({ deal, events, shift, onClose, onDecide, onSa
   const closeRef = useRef<HTMLButtonElement>(null);
   const step = STAGES.findIndex((s) => s.state === deal.state);
   const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
-  const times = shopLabelMap(events.filter((e) => e.deal_id === deal.id), shift);
+  const times = shopLabelMap(events, shift);
+  const shopTimed = history.some((e) => times.has(e.id));
   const stopped = deal.state === "dropped";
   const memory = events.filter((e) => e.deal_id === deal.id && e.type === "write" && typeof e.data.artifact === "string");
   const lastAudio = deal.chat.map((t) => Boolean(t.audio_url)).lastIndexOf(true);
@@ -225,7 +226,7 @@ export default function DealPanel({ deal, events, shift, onClose, onDecide, onSa
         )}
 
         <section aria-labelledby="history">
-          <h3 id="history">History{shift?.started != null && <span className="muted small"> · shop time</span>}</h3>
+          <h3 id="history">History{shopTimed && <span className="muted small"> · shop time</span>}</h3>
           {history.length === 0 && <p className="empty">Nothing recorded for this car yet.</p>}
           <ol className="timeline">
             {history.map((e) => (
