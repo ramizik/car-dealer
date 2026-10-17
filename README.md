@@ -36,7 +36,7 @@ Each simulated seller type has a hidden weak tactic. The mapping exists only in 
 ```
 Dealer setup (dashboard) -> brain: dealer facts (budget, per-car limit, min profit, preferences)
         |
-POST /demo/start (alias /shift/start) -> swarm.py: a simulated 8-hour shop day, up to 3 deals in parallel; clear wins auto-approve, borderline ones wait for the dealer; after-buy steps run in the background
+POST /demo/start (alias /shift/start) -> swarm.py: a simulated 8-hour shop day, up to 4 deals in parallel, ~5 min; clear wins auto-approve, borderline ones wait for the dealer; after-buy steps run in the background
         |
 scout       You.com Search, Craigslist -> Contents -> Nano extract -> listings
 appraise    You.com Research -> Nano extract {low, mid, high, issues, sources} -> brain.market

@@ -37,11 +37,11 @@ EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
 _state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
           "phase": "idle", "deal": None, "continuous": False, "live": False, "live_done": False}
-SHIFT_SECS = float(os.getenv("DEMO_SHIFT_SECS", "600"))  # real seconds that stand for one 8-hour shop day
+SHIFT_SECS = float(os.getenv("DEMO_SHIFT_SECS", "300"))  # real seconds that stand for one 8-hour shop day
 SHIFT_HOURS = 8
-PARALLEL = int(os.getenv("DEMO_PARALLEL", "3"))  # cars negotiated at the same time
+PARALLEL = int(os.getenv("DEMO_PARALLEL", "4"))  # cars negotiated at the same time
 AUTO_PROFIT_X = 2.0  # buy or sell without asking when profit is at least this many times the dealer's minimum
-MAX_DEALS = 40
+MAX_DEALS = 80
 _cur: contextvars.ContextVar = contextvars.ContextVar("deal", default=None)  # the deal the running task works on
 _active: dict[str, str] = {}  # deal id (or "scout") -> what it is doing right now
 STATE_FILE = Path(__file__).parent / "data" / "state.json"
@@ -521,7 +521,7 @@ async def _workday() -> None:
                 pipes.add(t)
                 t.add_done_callback(pipes.discard)
                 spawned += 1
-                next_spawn = time.time() + random.uniform(4, 9)  # cars arrive staggered, like a real morning
+                next_spawn = time.time() + random.uniform(2, 5)  # cars arrive staggered, like a real morning
             await asyncio.sleep(0.5)
         emit("system", "state", f"Shop day over: {_state['n']} cars worked" + ("" if not pipes else f", {len(pipes)} still finishing"), {})
     finally:

@@ -34,11 +34,11 @@ const stepOf = (s: DealState) => STEPS.findIndex((x) => x.states.includes(s));
 // What the demo does once started. Shown before the button so nobody is surprised.
 const PLAN: { title: string; text: string }[] = [
   { title: "Finds cars all day", text: "The scout scans the market for cars that fit your setup and keeps looking as the shift goes on." },
-  { title: "Works several deals at once", text: "Up to 3 cars at a time: value it, call the seller, negotiate. New cars arrive while others are in progress." },
+  { title: "Works several deals at once", text: "Up to 4 cars at a time: value it, call the seller, negotiate. New cars arrive while others are in progress." },
   { title: "Asks you only when it must", text: "Clear wins are bought and sold automatically. Borderline buys and sales wait for your OK, and one seller phones in live for you to answer by voice or text." },
   { title: "Handles everything after the buy", text: "Shipping, the storefront listing and buyer talks run in the background until the car is sold." },
   { title: "Learns as it goes", text: "Every deal writes what worked to the shared brain, so later cars start smarter." },
-  { title: "A full shop day in minutes", text: "8 shop hours are compressed into a few minutes. You can stop at any time." },
+  { title: "A full shop day in minutes", text: "8 shop hours are compressed into about 5 minutes. You can stop at any time." },
 ];
 
 const shopClock = (minutes: number) => {
