@@ -1,5 +1,5 @@
 // Reads return null when the backend is unreachable. The UI then says so; it never shows made-up data.
-import type { AgentEvent, Brain, Deal, EvalResult, Health, OnboardingQuestion } from "./types";
+import type { AgentEvent, Brain, Deal, EvalResult, Health, Inventory, OnboardingQuestion } from "./types";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -44,6 +44,7 @@ export const api = {
   deals: () => get<Deal[]>("/deals"),
   events: (since = 0) => get<AgentEvent[]>(`/events?since=${since}`),
   brain: () => get<Brain>("/brain"),
+  inventory: () => get<Inventory>("/inventory"),
   eval: () => get<EvalResult>("/eval"),
   saveSetup: (answers: Record<string, string[]>) => post("/onboarding/answers", { answers }),
   onboardingQuestions: async () => (await get<OnboardingQuestion[]>("/onboarding/questions")) ?? [],

@@ -13,6 +13,7 @@ import os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import brain  # noqa: E402
+import craigslist  # noqa: E402
 import llm  # noqa: E402
 import dealer_memory  # noqa: E402
 import dealer_profile  # noqa: E402
@@ -250,6 +251,13 @@ def get_dealer():
 @app.get("/onboarding/questions")
 def onboarding_questions():
     return QUESTIONS
+
+
+@app.get("/inventory")
+def get_inventory():
+    """Cars to sell, from the saved Craigslist pull. Empty until craigslist.py has run."""
+    rows = craigslist.load()
+    return {"source": "craigslist", "count": len(rows), "listings": rows}
 
 
 @app.get("/brain")

@@ -7,8 +7,8 @@ import EvalView from "./EvalView";
 import ShiftView from "./ShiftView";
 import MoneyView from "./MoneyView";
 import OnboardingView from "./OnboardingView";
-import { money, profit, stageLabel } from "./format";
-import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
+import { CRAIGSLIST_POST, money, profit, stageLabel } from "./format";
+import type { AgentEvent, Brain, Deal, EvalResult, Health, Inventory } from "./types";
 
 type Section = "home" | "buying" | "inventory" | "selling" | "team" | "setup";
 
@@ -45,13 +45,15 @@ export default function App() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [brain, setBrain] = useState<Brain | null>(null);
   const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
+  const [inventory, setInventory] = useState<Inventory | null>(null);
   const [offline, setOffline] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [toast, setToast] = useState<string | null>(null);
 
   const refresh = async () => {
-    const [h, d, e, b, r] = await Promise.all([api.health(), api.deals(), api.events(), api.brain(), api.eval()]);
+    const [h, d, e, b, r, inv] = await Promise.all([api.health(), api.deals(), api.events(), api.brain(), api.eval(), api.inventory()]);
+    if (inv) setInventory(inv);
     setOffline(h === null);
     setHealth(h);
     if (d) setDeals(d);
@@ -176,6 +178,12 @@ export default function App() {
 
   const sellingCols: Column[] = [
     { label: "Status", render: status },
+    {
+      label: "Craigslist",
+      render: (d) => (d.state === "listed" || d.state === "sold"
+        ? <a href={CRAIGSLIST_POST} target="_blank" rel="noopener noreferrer">Post ad</a>
+        : <span className="muted">—</span>),
+    },
     { label: "Paid", render: (d) => money(d.bought_for), numeric: true },
     { label: "Listed at", render: (d) => money(d.list_price), numeric: true },
     { label: "Sold for", render: (d) => money(d.sold_for), numeric: true },
@@ -262,8 +270,33 @@ export default function App() {
               deals={deals} filters={inventoryFilters} columns={inventoryCols} empty="No cars here yet." onOpen={setOpenId} />
           )}
           {section === "selling" && (
-            <DealsList title="Selling" intro="Your listings and what sold, with profit on each car."
-              deals={deals} filters={sellingFilters} columns={sellingCols} empty="No listings yet." onOpen={setOpenId} />
+            <div className="stack">
+              <DealsList title="Selling" intro="Your listings and what sold, with profit on each car."
+                deals={deals} filters={sellingFilters} columns={sellingCols} empty="No listings yet." onOpen={setOpenId} />
+              <section aria-label="Cars to sell" className="stack-sm">
+                <header className="page-head">
+                  <h2>Cars to sell</h2>
+                  <p className="small muted">
+                    {inventory?.count ? `${inventory.count} real listings from ${inventory.source === "craigslist" ? "Craigslist (Stockton area)" : inventory.source}. Prices are the sellers' asking prices. Open a listing to check it before you buy.` : "No listings loaded yet. Run the Craigslist pull to fill this list."}
+                  </p>
+                </header>
+                {inventory && inventory.listings.length > 0 && (
+                  <table className="list">
+                    <thead><tr><th>Car</th><th>Asking</th><th>Location</th><th><span className="sr-only">Open</span></th></tr></thead>
+                    <tbody>
+                      {inventory.listings.map((l) => (
+                        <tr key={l.url}>
+                          <td data-label="Car">{l.title}</td>
+                          <td data-label="Asking" className="num">{l.price ? money(l.price) : "—"}</td>
+                          <td data-label="Location">{l.location || "—"}</td>
+                          <td className="open-cell"><a href={l.url} target="_blank" rel="noopener noreferrer">Open listing</a></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </div>
           )}
           {section === "team" && (
             <div className="stack">

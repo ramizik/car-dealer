@@ -53,3 +53,18 @@ const AGENT_NAMES: Record<string, string> = {
 export const agentName = (a: string) => AGENT_NAMES[a] ?? a;
 
 export const greeting = (d = new Date()) => (d.getHours() < 12 ? "Good morning" : d.getHours() < 18 ? "Good afternoon" : "Good evening");
+
+// Craigslist cannot be posted to automatically (no API, CAPTCHA on posting). We draft the ad and
+// link to the Stockton posting page; a person reviews it and posts it themselves.
+export const CRAIGSLIST_POST = "https://stockton.craigslist.org/";
+
+export function craigslistDraft(d: Deal): { title: string; price: string; body: string } {
+  const price = d.list_price ? money(d.list_price) : "Ask me";
+  const title = `${d.car.split(" · ")[0]} - ${price}`;
+  const body = [
+    `${d.car}, ${price}.`,
+    "Inspected and detailed. Clean title. Call or message to see it.",
+    "Stockton, CA.",
+  ].join("\n");
+  return { title, price, body };
+}

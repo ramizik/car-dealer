@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { api } from "./api";
-import { STAGES, money, profit, time } from "./format";
+import { CRAIGSLIST_POST, STAGES, craigslistDraft, money, profit, time } from "./format";
 import type { AgentEvent, Deal } from "./types";
 import { CHANNEL_LABELS } from "./channels";
 import SellerTurn from "./SellerTurn";
@@ -73,6 +73,21 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
             </div>
           </section>
         )}
+
+        {(deal.state === "listed" || deal.state === "sold") && (() => {
+          const ad = craigslistDraft(deal);
+          return (
+            <section aria-label="Craigslist ad">
+              <h3>Craigslist ad (draft)</h3>
+              <p className="small muted">Review it, then post it yourself at Craigslist. Nothing is posted automatically.</p>
+              <div className="listing-copy">
+                <strong>{ad.title}</strong>
+                <pre className="ad-body">{ad.body}</pre>
+              </div>
+              <p className="small"><a href={CRAIGSLIST_POST} target="_blank" rel="noopener noreferrer">Open Craigslist to post</a></p>
+            </section>
+          );
+        })()}
 
         <dl className="facts-grid">
           <Num label="Asking" value={money(deal.asking)} />

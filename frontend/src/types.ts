@@ -145,3 +145,7 @@ export type OnboardingQuestion = {
   type: "single" | "multi";
   options: OnboardingOption[];
 };
+
+// Cars to sell from a public listing source (Craigslist), shown on the Selling page.
+export type InventoryItem = { title: string; price: number | null; location: string; url: string };
+export type Inventory = { source: string; count: number; listings: InventoryItem[] };
