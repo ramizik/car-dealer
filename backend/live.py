@@ -75,6 +75,7 @@ class LiveSeller:
     def __init__(self, deal: dict, fallback, emit):
         self.deal, self.fallback, self.emit = deal, fallback, emit
         self.patience_left = 5
+        self.called = False  # set once the phone has actually rung
         self.abandoned = False  # nobody picked up once: the sim seller carries the rest of the call
 
     def opening(self) -> str:
@@ -87,6 +88,7 @@ class LiveSeller:
         deal_id = self.deal["id"]
         if self.abandoned:
             return await self.fallback.respond(offer, tactic)
+        self.called = True
         self.deal["turn"] = {"who": "seller", "action": "answer", "since": time.time(), "offer": offer}
         fut = asyncio.get_running_loop().create_future()
         PENDING[deal_id] = fut

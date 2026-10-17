@@ -402,7 +402,7 @@ async def _one(sc: dict, live_call: bool = False) -> bool:
     _cur.set(deal_id)
     is_live = live_call  # one caller per shift is a person answering in the browser; the rest are simulated
     if is_live:
-        _state["live_done"] = True
+        _state["live_busy"] = True  # no second caller until this one has really phoned in
     deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
             "asking": sc["seller"]["ask"], "max_buy": round(max_buy), "listing_url": listing.get("url"),
             # Profit if we pay exactly the max: expected resale (same SELL_FACTOR and RECON as the sales desk) minus max and recon.
@@ -420,10 +420,16 @@ async def _one(sc: dict, live_call: bool = False) -> bool:
     seller = live.LiveSeller(deal, sim.make_seller(sc), emit) if is_live else sim.make_seller(sc)
     if is_live:
         deal["turn"] = {"who": "system", "action": "call", "since": time.time()}
-    r = await agents.negotiate({"id": deal_id, "ask": deal["asking"], "max_buy": max_buy, "seller_id": sc["seller"]["sid"],
-                                "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto", "voice": is_live,
-                                "chat_sink": deal["chat"]},
-                               seller, emit=emit)
+    try:
+        r = await agents.negotiate({"id": deal_id, "ask": deal["asking"], "max_buy": max_buy, "seller_id": sc["seller"]["sid"],
+                                    "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto", "voice": is_live,
+                                    "chat_sink": deal["chat"]},
+                                   seller, emit=emit)
+    finally:
+        if is_live:
+            _state["live_busy"] = False
+            if getattr(seller, "called", False):
+                _state["live_done"] = True  # the call happened; otherwise the next car gets the call
     deal["turn"] = None
     deal["chat"] = _chat(r)
     # Write-ahead: squeeze the chat into one artifact + status for the shared brain; raw chat stays private.
@@ -520,7 +526,8 @@ async def _workday() -> None:
                         queue = _supply(first)
                         first = False
                     continue
-                live_call = bool(_state["live"]) and not _state["live_done"] and spawned >= 1
+                live_call = (bool(_state["live"]) and not _state["live_done"] and not _state.get("live_busy")
+                             and time.time() - _state["started"] >= 5)  # the phone rings a few seconds in
                 t = asyncio.get_running_loop().create_task(_pipeline(queue.pop(0), live_call, done))
                 pipes.add(t)
                 t.add_done_callback(pipes.discard)
@@ -538,7 +545,7 @@ def start() -> bool:
     if _state["running"]:
         return False
     _state["running"] = True
-    _state["live"], _state["live_done"] = True, False
+    _state["live"], _state["live_done"], _state["live_busy"] = True, False, False
     _state["task"] = asyncio.get_running_loop().create_task(_workday())
     return True
 
