@@ -7,6 +7,7 @@ comes from code and brain data, never from the LLM. Assumptions are named consta
 reply says which numbers were estimated.
 """
 import brain
+import dealer_memory
 
 
 def usd(n: float) -> str:
@@ -22,11 +23,10 @@ MAX_DAYS = 45  # slower sellers than this are passed on
 
 
 def model_key(car: dict) -> str:
-    """Brain key for a make and model, e.g. 'toyota tacoma'. Uses car['make'] and car['model'] when given."""
-    make, model = car.get("make", ""), car.get("model", "")
-    if make and model:
-        return f"{make} {model}".lower()
-    return (car.get("car") or "unknown").split(" · ")[0].lower()
+    """Brain key for a make and model, e.g. 'toyota tacoma'. Same key the dealer's decisions use."""
+    if car.get("make") and car.get("model"):
+        return f"{car['make']} {car['model']}".lower()
+    return dealer_memory.model_key(car.get("car", ""))
 
 
 def days_to_sell(key: str) -> tuple[float, str]:

@@ -10,6 +10,7 @@ import re
 
 import brain
 import conversations
+import dealer_memory
 import llm
 import seller_agent
 import skills
@@ -157,6 +158,14 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     last = (known.get("facts", {}).get("last_counter_pct") or {}).get("value")
     if isinstance(last, (int, float)):
         cap = min(cap, ask * float(last))
+
+    # Learned from the dealer: stop bidding on models they keep declining.
+    skip, why = dealer_memory.should_skip(deal.get("car") or deal.get("listing", {}).get("title", ""))
+    if skip:
+        dropped = f"dealer preference: {why}"
+        emit("negotiator", "state", f"Dropped {deal_id}: {dropped}", {"deal_id": deal_id, "closed": False, "price": None})
+        return {"deal_id": deal_id, "closed": False, "price": None, "rounds": 0, "tactic": tactic, "segment": segment,
+                "ask": ask, "max_buy": max_buy, "dropped": dropped, "transcript": [], "recalled": memory}
 
     # Coordinate with the seller agent before spending: resale price, days to sell, profit at our max.
     q = _ask_seller_agent(deal, max_buy, emit, deal_id)

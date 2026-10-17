@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 import brain  # noqa: E402
+import dealer_memory  # noqa: E402
 import loop  # noqa: E402
 import memory  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
@@ -32,6 +33,19 @@ async def run(req: RunReq):
 @app.get("/memory")
 def get_memory():
     return memory.load()
+
+
+class DecisionReq(BaseModel):
+    yes: bool
+    car: str = ""
+    reason: str = ""
+
+
+@app.post("/deals/{deal_id}/approve")
+def decide(deal_id: str, req: DecisionReq):
+    """Save the dealer's answer so the team acts on it next time, even if this deal is not in memory yet."""
+    dealer_memory.record(req.car or deal_id, req.yes, req.reason)
+    return {"ok": True, "deal_id": deal_id, "saved": True}
 
 
 @app.get("/onboarding/questions")

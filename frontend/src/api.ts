@@ -39,7 +39,7 @@ export const api = {
   onboardingQuestions: () => get<OnboardingQuestion[]>("/onboarding/questions", []),
   startShift: () => post("/shift/start", { max_deals: 5 }),
   stopShift: () => post("/shift/stop"),
-  approve: (id: string, yes: boolean) => post(`/deals/${id}/approve`, { yes }),
+  approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
   loadSnapshot: (name: "cold" | "warm") => post(`/brain/load/${name}`),
   runEval: () => post("/eval/run"),
 };

@@ -50,7 +50,8 @@ export default function App() {
   }, []);
 
   const decide = async (id: string, yes: boolean) => {
-    const ok = await api.approve(id, yes);
+    // The dealer's answer is saved so the team acts on it next time.
+    const ok = await api.approve(id, yes, deals.find((d) => d.id === id)?.car ?? "");
     if (!ok) {
       // Offline: reflect the choice locally so the screen still responds.
       setDeals((ds) =>
