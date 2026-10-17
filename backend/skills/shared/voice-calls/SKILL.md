@@ -17,8 +17,40 @@ Both are NVIDIA cloud calls via `nvidia-riva-client` with `NVIDIA_API_KEY`. With
 3. On reply, `extract_phone(text)` returns `+1XXXXXXXXXX` or `None`. If `None`, ask once more, then fall back to text.
 4. Confirm the number back, masked: "I have +1******0142. Is that right?" Only save it after a clear yes.
 5. Save to `party` as `phone` with `consent: true`, `consent_at`, and the channel it came from.
-6. Write a `call_request` event: party, dealer, reason, preferred time window. **No call is placed by the hackathon build.** The dealer's desk sees the request on the dashboard.
+6. Write a `call_request` event: party, dealer, reason, preferred time window. The agents never dial out. The only live line is the dealer's own Twilio number, locked to the dealer's phone (see Phone line below).
 7. Tell the person when they will hear back, and what the call is about.
+
+## Phone line (Twilio, `backend/phone.py`)
+
+The dealer dials the Twilio number and plays the seller or buyer. Only `TWILIO_ALLOWED_CALLER` gets through; every request must carry a valid Twilio signature. Setup on the droplet: `bash nemoclaw/phone-setup.sh` (public HTTPS for `/twilio/*` only). Check: `GET /twilio/status`.
+
+Each turn: the caller's recording goes to Parakeet, the agent answers in at most 2 sentences, Magpie speaks it. Without `NVIDIA_API_KEY`, Twilio's own speech recognition and voice are used instead.
+
+## Call scripts (the code copy lives in `SCRIPTS` in `backend/phone.py`)
+
+Greeting: "Hi, this is the AI assistant for Joe's Auto. A team member reviews every deal. Press 1 if you're selling a car to us, or press 2 if you want to buy one."
+
+**Seller call (we buy), one question per turn:**
+1. Year, make and model.
+2. Rough mileage.
+3. Clean title? Any accidents?
+4. How many keys? Any loan on it?
+5. Why selling?
+6. When can we see it?
+7. Lowest number if we pick it up this week.
+Close: "The desk will check the market value and text you an offer."
+
+**Buyer call (we sell), one question per turn:**
+1. Which car, or what are they looking for?
+2. Budget they'd rather not go over.
+3. The one must-have.
+4. When they want to buy.
+5. Trade-in?
+6. Cash or financing?
+7. Zip code, in case we deliver.
+Close: "The desk will text you a few options and a time to see them."
+
+Call rules: acknowledge what they said, then ask the next question. Never quote, offer or agree to a price on a call (a reply containing a dollar amount is replaced by the planned question). Never ask for card, bank or ID numbers. "Bye", "stop" or 10 turns ends the call.
 
 ## Rules
 

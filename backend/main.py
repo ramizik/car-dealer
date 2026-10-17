@@ -21,10 +21,12 @@ import swarm  # noqa: E402
 import youcom  # noqa: E402
 import memory  # noqa: E402
 import librarian  # noqa: E402
+import phone  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
 
 app = FastAPI(title="dealer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(phone.router)  # Twilio phone calls: /twilio/*
 
 
 @app.on_event("startup")
