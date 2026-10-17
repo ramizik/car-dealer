@@ -48,6 +48,7 @@ PAYMENT_LINK = "https://secure-escrow-payments.example/pay?id={sid}"
 
 DATA = Path(__file__).parent / "data"
 SEED_LISTINGS = DATA / "seed_listings.json"
+SYNTHETIC_LISTINGS = DATA / "synthetic_inventory.json"  # gen_inventory.py, labeled synthetic
 
 
 def _fast() -> bool:
@@ -222,13 +223,13 @@ FALLBACK_LISTINGS = [  # synthetic, used only if seed_listings.json is missing
 
 
 def _listings() -> list[dict]:
-    try:
-        ls = json.loads(SEED_LISTINGS.read_text(encoding="utf-8"))
-        if ls:
-            return ls
-    except Exception:
-        pass
-    return FALLBACK_LISTINGS
+    ls = []
+    for path in (SEED_LISTINGS, SYNTHETIC_LISTINGS):
+        try:
+            ls += json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return ls or FALLBACK_LISTINGS
 
 
 def _scenario(i: int, seed: int, rng: random.Random, listings: list[dict], wholesaler_ids: list[str]) -> dict:

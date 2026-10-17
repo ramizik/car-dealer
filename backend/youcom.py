@@ -20,6 +20,7 @@ RESEARCH_URL = "https://api.you.com/v1/research"
 DATA = Path(__file__).parent / "data"
 CACHE = DATA / "cache"
 SEED_LISTINGS = DATA / "seed_listings.json"
+SYNTHETIC_LISTINGS = DATA / "synthetic_inventory.json"  # gen_inventory.py, labeled synthetic
 
 listeners = []  # callables(kind, payload): "call" | "cache_hit" | "error"
 STATS = {"calls": 0, "cache_hits": 0, "errors": 0, "latency_total": 0.0}
@@ -307,11 +308,14 @@ async def ask(question: str, effort: str = "lite") -> dict:
 
 
 def seed_listings() -> list[dict]:
-    """Guaranteed fallback listings (1.D5)."""
-    try:
-        return json.loads(SEED_LISTINGS.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    """Guaranteed fallback listings (1.D5): seed rows plus synthetic inventory when generated."""
+    rows = []
+    for path in (SEED_LISTINGS, SYNTHETIC_LISTINGS):
+        try:
+            rows += json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return rows
 
 
 def stats() -> dict:
