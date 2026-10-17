@@ -84,36 +84,66 @@ def pick_tactic(segment: str, epsilon: float = 0.0, rng=random) -> str:
     return max(TACTICS, key=lambda t: (score(t), t == DEFAULT_TACTIC))
 
 
-def _template(tactic, offer, round_, comps_mid=None):
-    lines = {
-        "fast_cash_pickup": f"I can pay ${offer:,.0f} cash and pick it up this week, no hassle.",
-        "comps_anchor": f"Similar ones nearby are going for less; ${offer:,.0f} is fair" + (f" against a ${comps_mid:,.0f} market." if comps_mid else "."),
-        "split_difference": f"Let's meet in the middle: ${offer:,.0f}.",
-        "volume_relationship": f"${offer:,.0f} works for us, and we buy regularly, so there's more business after this one.",
-        "walk_away_threat": f"${offer:,.0f} is where I am, otherwise I'll look at the other one I found.",
-    }
-    return lines.get(tactic, f"I can offer ${offer:,.0f}.") if round_ else f"Hi! Interested in your car. {lines.get(tactic)}"
+# Offline wording. Several lines per tactic so follow-up rounds never repeat word for word.
+FOLLOW_UPS = {
+    "fast_cash_pickup": ["I can pay ${o} cash and pick it up this week, no hassle.",
+                         "Cash in hand, ${o}, and we handle the pickup on your schedule.",
+                         "${o}, paid on the spot. You won't have to deal with strangers or test drives.",
+                         "Final push from me: ${o} cash, picked up whenever suits you."],
+    "comps_anchor": ["Similar ones nearby are going for less; ${o} is fair{m}.",
+                     "I checked recent sales of this model. ${o} lines up with what they sell for{m}.",
+                     "Going by comparable listings, ${o} is a strong number for this one.",
+                     "The market supports ${o}. That's me stretching to the top of the comps."],
+    "split_difference": ["Let's meet in the middle: ${o}.",
+                         "We're close. Splitting it puts us at ${o}.",
+                         "I'll move again if you do. ${o} gets us both there.",
+                         "Halfway is ${o}. Can we shake on that?"],
+    "volume_relationship": ["${o} works for us, and we buy regularly, so there's more business after this one.",
+                            "We buy a lot of these. At ${o} you'd have a repeat buyer, not a one-off.",
+                            "${o} today, and we'll call you first next time you have one to sell.",
+                            "I can go to ${o}. We'd like this to be the first of many deals."],
+    "walk_away_threat": ["${o} is where I am, otherwise I'll look at the other one I found.",
+                         "I have another option lined up. ${o} keeps me with yours.",
+                         "${o} is as far as I can go before I move on.",
+                         "Last offer from me: ${o}. After that I'll take the other truck."],
+}
+NODS = ["I hear you on ${c}. ", "Thanks for coming down to ${c}. ", "${c} is more than I can do. ", ""]
 
 
-async def _message(deal, tactic, offer, round_, seller_text, memory, party="", skill_text=""):
+def _template(tactic, offer, round_, comps_mid=None, counter=None):
+    m = f" against a ${comps_mid:,.0f} market" if comps_mid else ""
+    lines = FOLLOW_UPS.get(tactic, ["I can offer ${o}."])
+    if not round_:
+        return "Hi! Interested in your car. " + lines[0].replace("${o}", f"${offer:,.0f}").replace("{m}", m)
+    line = lines[round_ % len(lines)].replace("${o}", f"${offer:,.0f}").replace("{m}", m)  # lines[0] was the opening
+    nod = NODS[round_ % len(NODS)].replace("${c}", f"${counter:,.0f}") if counter else ""
+    return nod + line
+
+
+async def _message(deal, tactic, offer, round_, seller_text, memory, party="", skill_text="", counter=None, previous=()):
     comps = deal.get("comps_mid")
     if not USE_LLM_TEXT or llm._client is None:
-        return _template(tactic, offer, round_, comps)
+        return _template(tactic, offer, round_, comps, counter)
     car = deal.get("car") or deal.get("listing", {}).get("title", "the car")
     # Only the buyer-talk skill and the last few turns from the conversation file go to the model.
     history = conversations.recent(party) if party else ""
     text = await llm.chat(
         "You are a used-car buyer negotiating by text for a dealership. Write ONE short message (<=40 words). "
-        f"Use the tactic '{tactic}'. State exactly ${offer:,.0f} and no other price. No emojis.\n\n"
+        f"Use the tactic '{tactic}'. State our offer of exactly ${offer:,.0f}. You may mention the seller's last number, "
+        "but no other price. React to what they just said. Never reuse wording from your earlier messages. No emojis.\n\n"
         + skill_text,
         f"Car: {car}\nSeller said: {seller_text or '(listing only)'}\nMarket comps mid: {comps}\n"
         f"Recent conversation:\n{history or '(first message)'}\n"
+        f"Their last number: {f'${counter:,.0f}' if counter else 'none yet'}\n"
+        f"Your earlier messages (do not repeat their wording):\n" + ("\n".join(previous[-3:]) or "(none)") + "\n"
         f"Shared memory:\n" + ("\n".join(memory[:6]) or "(none)"),
         tier=tier_for("buyer/outreach"), temperature=0.4)
     text = text.strip()
     # LLM must not invent prices: fall back if the offer is missing or another $ amount appears
     amounts = {int(re.sub(r"[^\d]", "", a)) for a in re.findall(r"\$[\d,]+", text)}
-    return text if text and amounts == {int(offer)} else _template(tactic, offer, round_, comps)
+    allowed = {int(offer)} | ({int(counter)} if counter else set())
+    ok = text and int(offer) in amounts and amounts <= allowed and text not in previous
+    return text if ok else _template(tactic, offer, round_, comps, counter)
 
 
 def _ask_seller_agent(deal: dict, buy_price: float, emit, deal_id: str) -> dict:
@@ -155,7 +185,6 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     voice_on = bool(deal.get("voice"))  # voice mode: speak agent lines, transcribe seller audio when given
     if voice_on and deal.get("seller_audio"):
         seller_text = voice.transcribe(deal["seller_audio"]) or seller_text
-    asked_number = False
 
     # recall: what we know about this seller and the dealer
     memory = brain.recall(["party", "dealer"], keys=[party, deal.get("dealer_key", "joes-auto")], agent="negotiator")
@@ -222,7 +251,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     channel = outreach.channel_for(segment, "seller", deal.get("channels"))
     transcript, counter, closed, price, dropped = [], None, False, None, ""
     for r in range(MAX_ROUNDS):
-        msg = await _message(deal, tactic, offer, r, seller_text, memory, party, skill["text"])
+        previous = [t["text"] for t in transcript if t["from"] == "agent"]
+        msg = await _message(deal, tactic, offer, r, seller_text, memory, party, skill["text"], counter, previous)
         if r == 0:
             msg = f"{msg} {DISCLOSURE.format(dealer=dealer)}"
         msg = outreach.shape(channel, msg, first=(r == 0))
@@ -257,11 +287,6 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
             ack = f"Thanks, the desk will ring you on {masked} to set up the call."
             transcript.append({"from": "agent", "text": ack, "kind": "callback_set", "recalled": []})
             emit("negotiator", "callback", ack, {"deal_id": deal_id, "phone": masked})
-        elif counter is not None and not asked_number and not accepted:
-            asked_number = True
-            question = "Happy to set up a call. What number should the desk ring you on?"
-            transcript.append({"from": "agent", "text": question, "kind": "ask_number", "recalled": []})
-            emit("negotiator", "message", question, {"deal_id": deal_id, "kind": "ask_number"})
         if r == 0 and segment == "unknown":
             segment = await classify_segment(seller_text)
             if segment != "unknown":  # re-pick so the playbook credits the tactic actually used for this segment
@@ -283,6 +308,12 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         offer = min(offer, max_buy)  # hard clamp in code, never trust the model
     else:
         dropped = "no deal within round limit"
+    if closed and not voice.CALLBACKS.get(party):
+        # Interested now: ask once for a number so the desk can arrange pickup by phone.
+        question = "Great, we have a deal. What number should the desk ring you on to arrange pickup?"
+        transcript.append({"from": "agent", "text": question, "kind": "ask_number", "recalled": []})
+        show(deal, transcript[-1])
+        emit("negotiator", "message", question, {"deal_id": deal_id, "kind": "ask_number"})
 
     # write: what we learned, for every future agent
     brain.write("negotiator", "playbook", f"{tactic}|{segment}", "counter", {"tries": 1, "wins": int(closed), "saved": round((ask - price) / ask, 4) if closed else 0}, source=f"chat:{deal_id}")
