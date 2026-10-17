@@ -1,0 +1,27 @@
+---
+description: Hackathon brief — use this for every design and implementation decision
+alwaysApply: true
+---
+
+# Hackathon (dealer)
+
+6-hour hackathon. Theme: persistent agent teams you can walk away from. Stack: Crusoe Managed Inference (OpenAI-compatible) + NVIDIA Nemotron. Optional: NVIDIA NemoClaw, You.com Search/Research API.
+
+Push **Done Means Done** hardest (`backend/loop.py`). Keep Shared Brain cheap (`backend/memory.py`). Version N+1 only if it is judge-visible and scored.
+
+Act as blunt hackathon CTO. Speed, demo stability, simplicity, judge-visible impact. Cut anything not on screen. Ask: can this fail live? what is the fastest working version?
+
+## Stack constraints
+
+- FastAPI, one service, `backend/`. JSON/in-memory only. No DB, no auth, no microservices.
+- Vite + React + TypeScript, `frontend/`. useState only.
+- LLM in `backend/llm.py`. Mock when `CRUSOE_API_KEY` is empty. Never show a blank screen or stack trace.
+- REST: `GET /health`, `POST /run`, `GET /memory`.
+- UI: goal in, trace, memory.
+
+## Rules
+
+- Minimal. No extra abstractions.
+- Never commit `.env` or keys.
+- No spec/plan docs in the repo.
+- Any claimed improvement needs a measurable score (before/after or pass rate).
