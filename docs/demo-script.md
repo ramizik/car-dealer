@@ -29,22 +29,23 @@ The owner's own input (onboarding answers, approve/decline decisions) lands in t
 
 | Clock | Say | Do | Expected on screen (milestone) |
 |---|---|---|---|
-| 0:00 | "Joe runs a used-car lot. Sourcing, haggling, shipping, listing eats his day. This team does it while he walks away." | Open Shift tab, cold brain. | Insights shows 0 lessons, 0 mistakes. |
-| 0:20 | "I tell it my rules once." | Show Onboarding / Your rules (min profit $1,500, max buy). | "Your rules" card has dealer decisions. **M1: owner input is in the shared brain.** |
-| 0:35 | "Start a 5-deal shift." | Shift > 5 deals > Start shift. | Phase goes scouting -> sourcing. Scout finds real You.com listings, appraiser writes `market / value:...` with low/mid/high. **M2: real listing valued, written to memory.** |
-| 1:00 | "Before it talks, the negotiator reads memory, including similar past deals." | Point at feed. | `negotiator recall N memories`, `1 similar past deals` (expands to `[SUCCESS] 2008 Toyota RAV4: closed $8,850 vs ask $10,600 ...`), then `Chose tactic ...`. Similar deals only appear after the first librarian run (deal 3+) on a cold brain; warm brain shows them from deal 1. **M3: read-before-work visible, incl. vector recall.** |
-| 1:20 | "After the talk, the raw chat stays private. Only one result line is shared." | Point at feed. | `Saved to memory: [SUCCESS] closed $9,250 vs ask $11,000 ...` and `(private to negotiator) ... chat gist: ...`. **M4: two layers, shared vs private.** |
-| 1:45 | "Sales desk reads the same shared brain and protects Joe's margin." | Point at a dropped deal. | `Dropped D-203: sales desk: profit -$330 is under your $1,500 minimum`. **M5: a different agent acted on shared memory and the owner's rule.** |
-| 2:00 | "A buy needs my OK." | Decisions card > Approve. | Deal moves bought -> in transit -> delivered -> listed. Storefront (`/storefront`) shows the merchandiser's listing. **M6: walk-away pipeline runs in the background.** |
-| 2:30 | "Every 3 deals the librarian turns experience into lessons." | Insights > Shared brain. | Feed `Memory tidied: X -> Y entries, N lessons`. Cards: `haggler sellers -> walk away threat wins 4/5`, `Repeated miss: seller walked away`. Log smaller, recall unchanged. **M7: memory gets smaller and smarter, conflict-free.** |
-| 3:00 | "Does it actually help? Same agents, brain off vs on, on 10 sellers they've never seen." | Insights > Brain off vs on. | Saved vs asking **13.7% -> 16.4%** (seed 2: 15.4% -> 19.9%), rounds **3.9 -> 2.9**, scams blocked 1/1 both. **M8: measured gain.** |
-| 3:30 | "It runs inside NemoClaw. A scam seller asks for payment on a fake site; the sandbox blocks it." | `openshell term` on droplet. | Blocked egress line. **M9: NVIDIA safety moment.** |
-| 3:50 | "Joe walks away; the team keeps working and keeps learning." | Shift > Until I stop it. | Close. |
+| 0:00 | "Joe runs a used-car lot. Sourcing, haggling, shipping, listing eats his day. This team does it while he walks away." | Shift page, cold brain. | Stats row at 0, "Recent memories" empty. |
+| 0:15 | "I tell it my rules once." | Setup: min profit $1,500, max buy. | Rules saved to the `dealer` scope. **M1: owner input is in the shared brain.** |
+| 0:30 | "One button: a full 8-hour shop day in 5 minutes, four cars at once." | Sidebar > **Start Demo**. | Progress bar runs. Findings: real Craigslist listings, You.com valuations with low/mid/high. **M2: real listing valued, written to memory.** |
+| 0:55 | "Before it talks, every agent reads the shared brain. After, it writes back." | Point at stats row and "Recent memories". | "Memory reads" / "Memory writes" climb; memories show scope chips (market, party, playbook). Decisions: `Chose tactic "comps anchor" for a haggler seller`. **M3: read-before, write-after, visible.** |
+| 1:15 | "Open any deal: you see exactly what it remembered on each turn." | Click a deal card. | Chat with "Recalled:" chips under agent messages, "Saved to team memory" list, You.com citation links. **M4: recall is per turn and auditable.** |
+| 1:40 | "One seller phones in live. I answer as the seller." | Deal drawer with the turn banner: record by mic or type. | Agent voice (Magpie) plays, my answer is transcribed (Parakeet), the negotiator counters. **M5: NVIDIA speech in the loop.** |
+| 2:10 | "Clear wins it buys alone. Borderline ones and every sale wait for me." | Decisions > Approve a buy, then Sell on a sale. | Deal moves bought -> in transit -> listed -> sold; profit shows in stats. **M6: walk-away pipeline asks only when it must.** |
+| 2:35 | "A different agent acts on the same memory." | Point at a dropped deal in Decisions. | `sales desk: profit -$330 is under your $1,500 minimum`. Librarian line `Memory tidied: X -> Y entries, N lessons`. **M7: shared, conflict-free, gets smaller.** |
+| 3:00 | "Does memory actually help? Same agents, brain off vs on, 10 sellers they've never seen." | "Measured: brain off vs on" card under Recent memories. | Saved off asking **13.7% -> 16.4%** (seed 2: 15.4% -> 19.9%), rounds **3.9 -> 2.9** (26% fewer model turns per car), scams blocked both. **M8: measured gain.** |
+| 3:25 | "It runs inside NemoClaw. A scam seller sends a payment link; the sandbox blocks it." | `openshell term` on droplet; red "blocked" row in the feed. | Blocked egress line. **M9: NVIDIA safety moment.** |
+| 3:50 | "Joe walks away; the team keeps working and keeps learning." | Leave the shift running. | Close. |
 
 ## If something breaks live
 
-- Feed stalls (Crusoe 429): keep talking over M7/M8, they are already on screen from the warm brain. `POST /shift/stop`.
-- Blank Insights: backend down, restart it; state reloads from `data/state.json`.
+- Feed stalls (Crusoe 429): after 2 failed calls the app switches to template messages for 60 s and shows a "Degraded" banner; prices and memory keep working. Say "it degrades instead of dying" and keep going.
+- Live seller never answers: it falls back to the simulated seller after 120 s.
+- Blank page: backend or tunnel down, restart it; state reloads from `data/state.json`.
 - No gist line: no LLM key or the fast model failed. Shared `[STATUS]` line still shows; say "private notes stay with the negotiator".
 
 ## Verified 2026-10-17 (live, Nemotron on Crusoe, 3-deal shift)
