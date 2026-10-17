@@ -2,6 +2,7 @@
 
 Prices are decided in code (deterministic, clamped to max_buy); the LLM only writes the words.
 """
+import asyncio
 import inspect
 import os
 import random
@@ -160,6 +161,10 @@ def _ask_seller_agent(deal: dict, buy_price: float, emit, deal_id: str) -> dict:
     return q
 
 
+# Demo pacing: seconds between negotiation messages so each step can be read on stage. 0 for eval and tests.
+PACE_SECS = float(os.getenv("DEMO_PACE", "0"))
+
+
 def bubble(t: dict) -> dict:
     """A transcript line as the dashboard chat shows it."""
     return {k: v for k, v in {"from": t["from"], "text": t["text"], "tactic": t.get("tactic"), "channel": t.get("channel"),
@@ -263,6 +268,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         transcript.append(entry)
         show(deal, entry)
         emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic, "channel": channel})
+        if PACE_SECS and not voice_on:
+            await asyncio.sleep(PACE_SECS)
 
         reply = seller.respond(int(offer), tactic)
         accepted, counter, seller_text = await reply if inspect.isawaitable(reply) else reply
@@ -271,6 +278,8 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         transcript.append({"from": "seller", "text": seller_text, "counter": counter})
         show(deal, transcript[-1])
         emit("seller", "message", seller_text, {"deal_id": deal_id, "counter": counter})
+        if PACE_SECS and not voice_on:
+            await asyncio.sleep(PACE_SECS)
 
         if re.search(r"https?://", seller_text or ""):
             dropped = "seller sent an off-platform payment link"

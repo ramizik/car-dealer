@@ -5,6 +5,7 @@ import type { AgentEvent, Deal } from "./types";
 import { CHANNEL_LABELS } from "./channels";
 import SellerTurn from "./SellerTurn";
 import TurnBanner from "./TurnBanner";
+import { decisionLine, nowFor } from "./status";
 
 type Props = {
   deal: Deal;
@@ -44,18 +45,35 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           <button ref={closeRef} onClick={onClose}>Close</button>
         </header>
 
-        {stopped ? (
-          <p className="notice danger">Stopped: {deal.drop_reason}</p>
-        ) : (
-          <>
-            <p className="stage">
-              Step {step + 1} of {STAGES.length}: <strong>{STAGES[step]?.label ?? "Found"}</strong>
-            </p>
-            <div className="progress" role="img" aria-label={`${Math.round(progress)}% through the process`}>
-              <div style={{ width: `${progress}%` }} />
-            </div>
-          </>
-        )}
+        {/* What is happening now, and whether it needs you. Same wording as the Shift page. */}
+        {(() => {
+          const now = nowFor(deal);
+          return (
+            <section className={`now-card now-${now.tone}`} aria-label="What is happening now">
+              <span className="now-label">{now.action ? "Needs you" : now.tone === "agent" ? "Agent" : now.tone === "stopped" ? "Stopped" : "Status"}</span>
+              <strong>{now.title}</strong>
+              <p className="small">{now.detail}</p>
+              <p className="small muted">{decisionLine(deal)}</p>
+            </section>
+          );
+        })()}
+
+        {/* Every step of the deal, so it is clear where this car is. */}
+        <ol className="steps" aria-label="Deal steps">
+          {STAGES.map((s, i) => {
+            const at = stopped ? -1 : step;
+            const cls = i < at ? "done" : i === at ? "now" : "todo";
+            return (
+              <li key={s.state} className={cls} aria-current={cls === "now" ? "step" : undefined}>
+                <span aria-hidden>{cls === "done" ? "✓" : cls === "now" ? "●" : "○"}</span> {s.label}
+              </li>
+            );
+          })}
+        </ol>
+        {stopped && <p className="small muted">Stopped before step {Math.max(0, step) + 1}. Steps after this did not run.</p>}
+        <div className="progress" role="img" aria-label={`${Math.round(progress)}% through the process`}>
+          <div style={{ width: `${progress}%` }} />
+        </div>
 
         {!stopped && (deal.live || deal.turn) && <TurnBanner deal={deal} />}
         {!stopped && deal.turn?.who === "seller" && <SellerTurn dealId={deal.id} offer={deal.turn.offer} />}

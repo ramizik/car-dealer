@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import ActivityFeed from "./ActivityFeed";
 import { agentName, money, profit, time } from "./format";
+import { needsYou, nowFor } from "./status";
 import type { AgentEvent, Brain, Deal, DealState, EvalResult, Health } from "./types";
 
 type Props = {
@@ -84,7 +85,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
 
   const approvals = deals.filter((d) => d.state === "awaiting_approval" || d.state === "awaiting_sale");
   const current = deals.find((d) => d.id === shift?.deal);
-  const waitingOnYou = deals.find((d) => d.turn?.who === "seller");
+  const waiting = deals.filter(needsYou);
   const last = events[events.length - 1];
 
   const decisions = [...shiftEvents].reverse().filter(
@@ -107,7 +108,15 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
         <div className="mission-main">
           <span className={`run-state ${running ? "on" : ""}`} role="status">{status}</span>
           <h1 id="shift-title">
-            {running ? PHASES[shift?.phase ?? ""] ?? shift?.phase : started ? "Shift complete" : "Start a buying shift"}
+            {running
+              ? waiting.length
+                ? "Waiting for you"
+                : PHASES[shift?.phase ?? ""] ?? shift?.phase
+              : started
+                ? waiting.length
+                  ? "Shift paused for you"
+                  : "Shift complete"
+                : "Start a buying shift"}
           </h1>
           <p className="mission-sub">
             {running && current
@@ -115,7 +124,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
               : running
                 ? last?.text ?? "Starting up"
                 : started
-                  ? `Worked ${shift?.n ?? 0} deals in ${clock(elapsed)}. Everything learned is saved for the next shift.`
+                  ? `Worked ${shift?.n ?? 0} deals in ${clock(elapsed)}. ${waiting.length ? `${waiting.length} still need you below.` : "Everything learned is saved for the next shift."}`
                   : "The team scouts, values and negotiates on its own. Walk away; buys wait for your OK."}
           </p>
         </div>
@@ -127,11 +136,6 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
           <div className="progress big" role="img" aria-label="Shift progress">
             <div style={{ width: `${shift?.cap ? Math.min(100, (shift.n / shift.cap) * 100) : 0}%` }} className={running ? "live" : ""} />
           </div>
-          {waitingOnYou && (
-            <button className="turn-callout" onClick={() => onOpen(waitingOnYou.id)}>
-              <span className="turn-pill">YOUR TURN</span> The seller in {waitingOnYou.id} is waiting for you. Open the deal
-            </button>
-          )}
           {running ? (
             <button onClick={onStop}>Stop shift</button>
           ) : (
@@ -148,6 +152,30 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
           )}
         </div>
       </section>
+
+      {/* Needs you: every deal waiting on a person, with the one action. Empty when the team is working alone. */}
+      {waiting.length > 0 && (
+        <section className="needs-you" aria-labelledby="needs-you-title">
+          <h2 id="needs-you-title">Needs you ({waiting.length})</h2>
+          <ul>
+            {waiting.map((d) => {
+              const now = nowFor(d);
+              return (
+                <li key={d.id}>
+                  <button className="needs-row" onClick={() => onOpen(d.id)}>
+                    <span className="turn-pill">{now.action === "seller" ? "YOUR TURN" : "YOUR OK"}</span>
+                    <span>
+                      <strong>{d.car.split(" · ")[0]}</strong> <span className="muted small">{d.id}</span>
+                      <span className="small">{now.title}. {now.detail}</span>
+                    </span>
+                    <span className="needs-open">Open</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Pipeline: how many deals sit at each step, then every deal on its own track. */}
       <section className="panel" aria-labelledby="pipeline">

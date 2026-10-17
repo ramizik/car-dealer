@@ -519,3 +519,21 @@ button:not(:disabled):active { transform: scale(0.97); }
 }
 
 .ad-body { white-space: pre-wrap; margin: 8px 0 0; font: inherit; font-size: 14px; color: var(--ink-2); }
+
+/* What is happening now (deal drawer and Shift page). Colour is backed by a text label each time. */
+.now-card { margin: 12px 0; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); display: grid; gap: 4px; }
+.now-card .now-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.now-card.now-you { border: 2px solid var(--attn); background: var(--attn-soft); }
+.now-card.now-you .now-label { color: var(--attn); }
+.now-card.now-stopped { border-color: var(--danger); background: var(--danger-soft); }
+.now-card.now-done { background: var(--ok-soft); }
+.steps { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.steps li { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-3); }
+.steps li.done { color: var(--ok); border-color: var(--ok); }
+.steps li.now { color: var(--ink); border: 2px solid var(--ink); font-weight: 700; }
+.needs-you { margin-bottom: 16px; padding: 14px; border-radius: var(--radius); border: 2px solid var(--attn); background: var(--surface); }
+.needs-you h2 { font-size: 16px; margin-bottom: 8px; }
+.needs-you ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.needs-row { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--attn-line); background: var(--attn-soft); }
+.needs-row > span:nth-child(2) { display: grid; gap: 2px; }
+.needs-open { font-weight: 700; color: var(--attn); }
