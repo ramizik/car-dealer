@@ -1,119 +1,62 @@
 # Dealer: an AI agent team for used-car dealers, with a shared brain
 
-A team of Nemotron agents finds real used-car listings, appraises them with cited sources, negotiates with sellers, asks the owner to approve, then lists and sells the car. Every agent reads a **shared brain** before it works and writes to it after. On sellers it has never seen, the team negotiates measurably better and faster than the same agents with the brain off.
+A team of Nemotron agents finds real used-car listings, appraises them with cited sources, negotiates with sellers, gets the owner's approval, then lists and sells the car. Every agent reads a **shared brain** before it works and writes to it after, so the team gets better with every deal.
 
-**Track:** Shared Brain. **Sponsors used:** Crusoe Managed Inference, NVIDIA Nemotron, NVIDIA NemoClaw / OpenShell, You.com APIs, NVIDIA Speech (Parakeet, Magpie) and embeddings.
-
-**Status (2026-10-17):** the full pipeline runs in code, and the brain OFF vs ON eval is measured. The dashboard has one **Start Demo** button: a simulated 8-hour shop day in about 5 minutes with up to 4 deals at once, buying and selling together. The live seller call (a person answers in the browser) and the NVIDIA speech path are built and their pieces pass, but the full live call in the browser is not yet tested. The detailed state and next steps are in [`agents/plans/roadmap.md`](agents/plans/roadmap.md) under "Current state".
+**Track:** Shared Brain.
 
 ## Result: brain OFF vs ON
 
-`cd backend && SIM_FAST=1 python eval.py` (about 20 s, offline). The brain trains on 20 simulated sellers and is tested on 10 sellers it has never seen. `EVAL_SEED=2` runs a second split.
+The brain trains on 20 simulated sellers and is tested on 10 sellers it has never seen.
 
 | Held-out sellers | Brain OFF | Brain ON |
 |---|---|---|
-| Saved vs asking price (seed 1 / seed 2) | 13.7% / 15.4% | **16.4% / 19.9%** |
-| Share of the possible discount captured (seed 1 / seed 2) | 100.6% / 93.6% | **119.6% / 122.7%** |
-| Rounds to close (seed 1 / seed 2) | 3.9 / 3.4 | **2.9 / 2.4** |
-| Deals closed, scam blocked (seed 1 / seed 2) | 10/10, 1/1 / 10/10, 1/1 | 10/10, 1/1 / 10/10, 1/1 |
+| Saved vs asking price | 13.7% / 15.4% | **16.4% / 19.9%** |
+| Share of possible discount captured | 100.6% / 93.6% | **119.6% / 122.7%** |
+| Rounds to close | 3.9 / 3.4 | **2.9 / 2.4** |
+| Deals closed, scam blocked | 10/10, 1/1 | 10/10, 1/1 |
 
-Seed 1 is stored in `backend/data/eval_result.json`. Seed 2 was re-run on 2026-10-17 with `EVAL_SEED=2`. Two seeds is not yet a spread; more seeds are on the roadmap.
-
-Each simulated seller type has a hidden weak tactic. The mapping exists only in `backend/sim.py`; agents never see it. The brain-ON agents learn it from playbook stats stored in the brain.
-
-## What it does
-
-- **Source:** You.com Search finds real listings near the dealer, and Craigslist listings are pulled as well. Nemotron Nano parses year, miles, price and VIN from page text.
-- **Appraise:** You.com Research (`lite`) returns a fair-value range with citations. These become `market` facts in the brain, with source URLs. A VIN check looks for web-reported flags.
-- **Negotiate:** the buyer agent identifies the seller type, recalls that seller and the playbook, picks a tactic, and haggles within the dealer's max. Offers are clamped in code, not by the model. Off-platform payment links are blocked and the seller is red-flagged.
-- **Owner approval:** clear wins (profit at least 2x the dealer's minimum) are bought and sold automatically. Borderline buys and sales appear under **Needs you** with their own Buy / Sell buttons. Declines become dealer preferences that later scouting respects.
-- **List and sell:** the seller agent writes the listing, then negotiates with simulated buyers above the dealer's floor and minimum profit. Three cars are already on the lot when the shift opens, so buyer offers arrive in the first seconds while buying continues.
-- **Live seller call:** about 5 seconds into the demo one seller phones in (a **Live call** row under Needs you). The agent's lines are spoken (Magpie), and the seller's answer is recorded in the browser (Parakeet) or typed. No answer within 60 s and the simulated seller carries the rest of the call. No real person is contacted.
-- **Concierge:** an OpenClaw agent in a NemoClaw sandbox drives the dealer API ("start a shift for Tacomas", "what happened overnight?").
+Two random splits (seed 1 / seed 2). Each seller type has a hidden weak tactic that agents never see; with the brain on, they learn it from shared playbook stats.
 
 ## Pipeline
 
 ```
-Dealer setup (dashboard) -> brain: dealer facts (budget, per-car limit, min profit, preferences)
-        |
-POST /demo/start (alias /shift/start, any body ignored) -> swarm.py: a simulated 8-hour shop day in DEMO_SHIFT_SECS (300 s), up to DEMO_PARALLEL (4) deals at once,
-            cars arrive every 2-5 s, 3 cars already on the lot get buyer offers from the start; clear wins auto-approve,
-            borderline ones wait for the dealer; after-buy steps run in the background
-        |
-scout       You.com Search, Craigslist -> Contents -> Nano extract -> listings
-appraise    You.com Research -> Nano extract {low, mid, high, issues, sources} -> brain.market
-negotiate   recall(party, dealer, playbook) -> segment -> tactic -> seller (sim, or live person)
-            -> brain.write(playbook counter, party facts, red flags) + MISTAKES.md on a miss
-approve     clear win -> auto; else state=awaiting_approval -> Needs you: Buy / Decline -> POST /deals/{id}/approve (sales: POST /deals/{id}/sale)
-logistics, storefront, sell   transport quote -> listing copy -> sim buyer -> sold, margin -> brain.write
-librarian   every 3 deals: compacts the brain, distils lessons
-        |
-GET /events, /deals, /brain, /eval -> React dashboard
+scout       You.com Search + Craigslist -> Nemotron Nano extracts year, miles, price, VIN
+appraise    You.com Research -> cited fair-value range -> brain (market facts)
+negotiate   recall seller + playbook from brain -> pick tactic -> haggle within dealer's max
+approve     clear wins go through; borderline deals wait for the owner (Buy / Decline)
+sell        transport quote -> listing copy -> negotiate with buyers above the floor
+librarian   every few deals: compacts the brain and distils lessons
 ```
 
-**Read-before / write-after.** Each agent loads its own `backend/skills/<agent>/SKILL.md` plus its top `MISTAKES.md` lines, then `brain.recall()`s company facts within a character budget. It works, then `brain.write()`s facts and counters.
+**Read before, write after.** Each agent loads its skill file and past mistakes, recalls relevant brain facts, works, then writes new facts and tactic stats back.
 
-**The brain** (`backend/brain.py`) is an append-only event log with a pure reducer, so replay order doesn't change the result. It has four scopes (dealer, party, market, playbook), capped observations, a TTL on market prices, explicit conflict records, and cold/warm snapshots for the demo. Long-term memory search uses an embedded vector store (`vector_memory.py`).
+**The brain** is an append-only event log with a pure reducer, so concurrent agents never conflict. Four scopes (dealer, party, market, playbook), capped observations, expiring market prices, plus vector search for long-term memory.
 
-## Sponsors: how each is used
+**One-click demo.** **Start Demo** runs a simulated shop day with several deals in parallel, buying and selling at once, plus a live seller call where a person answers by voice in the browser.
 
-| Sponsor | Where | How |
-|---|---|---|
-| **Crusoe Managed Inference** | `backend/llm.py` | Every LLM call goes through the OpenAI-compatible API, with per-model RPM throttling, 429/503 backoff and a mock fallback. |
-| **NVIDIA Nemotron** | `backend/agent_tiers.py`, `backend/llm.py` | 3 Super: owner lead, buyer agent (negotiation, appraisal), seller agent. 3 Nano: listing extraction, classification. 3.5 Lightning: simulated sellers and buyers, librarian. Nano Omni: photo checks (stretch). |
-| **NVIDIA NemoClaw / OpenShell** | `nemoclaw/` | The `dealer` sandbox (OpenClaw on Crusoe Nemotron 3 Super) runs on a DigitalOcean droplet. Egress policy allows only You.com and the dealer API; the scam payment domain is blocked and shows in `openshell term`. The `dealer-concierge` skill drives the API. |
-| **You.com** | `backend/youcom.py` | Search (listings), Contents (listing pages), Research (cited valuations). Disk cache plus `DEMO_MODE=1` for offline runs; it never raises. |
-| **NVIDIA Speech and embeddings** | `backend/voice.py`, `backend/vector_memory.py` | Parakeet ASR (`parakeet-tdt-0_6b-v2`) and Magpie TTS (`magpie-tts-multilingual`) on NVCF for the live seller. Embeddings from `nvidia/nemotron-3-embed-1b` for memory search. Without `NVIDIA_API_KEY`, the seller answers by text and search uses a local hash embedding. |
+## Sponsors
+
+| Sponsor | How we use it |
+|---|---|
+| **Crusoe Managed Inference** | Every LLM call goes through Crusoe's OpenAI-compatible API. |
+| **NVIDIA Nemotron** | Super for the owner lead, buyer and seller agents; Nano for extraction; Lightning for simulated parties and the librarian. |
+| **NVIDIA NemoClaw / OpenShell** | A concierge agent runs in a sandbox and drives the dealer API. Egress policy allows only You.com and our API, and blocks the scam payment domain. |
+| **You.com** | Search finds listings, Contents reads them, Research returns cited valuations. |
+| **NVIDIA Speech + embeddings** | Parakeet (speech-to-text) and Magpie (text-to-speech) for the live seller call; Nemotron embeddings for memory search. |
+
+## Safety
+
+- Every seller and buyer is simulated; real listings are read-only. No real person is contacted.
+- Offers above the dealer's max and sales below the floor are blocked in code, not by the model.
+- Off-platform payment links are blocked and the seller is red-flagged.
+- No borderline buy or sale happens without the owner's yes.
 
 ## Run
 
 ```bash
-cp .env.example backend/.env       # fill CRUSOE_API_KEY, YDC_API_KEY, NVIDIA_API_KEY (optional)
-cd backend && pip install -r requirements.txt
-cd backend && python crusoe_check.py     # verify Crusoe key and model tiers
-cd backend && python nvidia_check.py     # optional: verify NVIDIA key, speech and embeddings
-cd backend && uvicorn main:app --reload --port 8000
-cd frontend && npm install && npm run dev                  # dashboard
+cp .env.example backend/.env    # CRUSOE_API_KEY, YDC_API_KEY, NVIDIA_API_KEY (optional)
+cd backend && pip install -r requirements.txt && uvicorn main:app --port 8000
+cd frontend && npm install && npm run dev
 ```
 
-- **NVIDIA key:** build.nvidia.com, sign in, profile > API Keys > Generate. Put it in `backend/.env` as `NVIDIA_API_KEY=nvapi-...`. Never commit it.
-- **No keys:** mock mode, the full UI still works.
-- **`DEMO_MODE=1`:** You.com answers come from `backend/data/cache` (real listings, pre-warmed), so no network is needed.
-- **Live seller call:** press Start Demo and watch for the Live call row. The mic needs `localhost` or HTTPS.
-- **Demo tuning (env):** `DEMO_SHIFT_SECS` (300), `DEMO_PARALLEL` (4), `DEMO_PACE_MIN/MAX` (seconds between negotiation messages; try 2 and 5 so parallel deals visibly overlap).
-- **Eval:** `cd backend && SIM_FAST=1 python eval.py`. Set `EVAL_SEED=2` for the second split. Stop any running shift first.
-- **Reset the demo:** `cd backend && python reset_demo.py [cold|warm]`.
-- **NemoClaw sandbox:** follow `nemoclaw/SETUP.md`.
-
-## Status and known gaps
-
-Tested: brain order-independence and memory tiers (`test_brain.py`, `test_memory_tiers.py`), the eval, and the NVIDIA speech round trip (`nvidia_check.py`).
-
-Not yet tested:
-- The live call in the browser: mic recording, the turn banner, agent audio playback, and the typed fallback.
-- The redesigned Shift page (Needs you, deal board) in a browser with the real model: only typechecked and run against the mock backend.
-- Real speech inside a live negotiation (only the standalone round trip has run).
-- Mic access on a non-localhost origin (needs HTTPS).
-- The dashboard served from the droplet (the demo currently runs from a laptop against the droplet API or a local backend).
-- Degraded mode after repeated LLM failures.
-
-## Safety
-
-- No real person is contacted. Real listings are read-only, and every seller and buyer is simulated. The live seller is the only human, and that is someone at the dealer's own desk playing the seller in a demo.
-- Every outbound message carries an AI-assistant disclosure.
-- No borderline buy or sale happens without the owner's yes; only clear wins (profit at least 2x the minimum) go through alone.
-- Offers above `max_buy` and sales below the floor are blocked in code.
-- Keys stay in `backend/.env` (never committed) or the OpenShell gateway, outside the sandbox.
-
-## Layout
-
-```
-backend/   FastAPI: main.py (routes), swarm.py (shift), ops.py (logistics, storefront), agents.py (negotiation),
-           live.py (live seller), brain.py, memory_layer.py, vector_memory.py, librarian.py,
-           sim.py, eval.py, youcom.py, craigslist.py, llm.py, voice.py, skills.py,
-           nvidia_check.py, crusoe_check.py, reset_demo.py
-backend/skills/  SKILL.md + MISTAKES.md per agent
-frontend/  Vite + React + TypeScript dashboard (Shift with Start Demo, Needs you and deal board; Buying, Inventory, Selling, Insights, Setup)
-nemoclaw/  sandbox runbook, egress presets, concierge skill
-docs/project-idea.md   full pitch; agents/plans/roadmap.md   build plan and current state
-```
+Without keys the app runs in mock mode. Eval: `cd backend && SIM_FAST=1 python eval.py`. NemoClaw setup: `nemoclaw/SETUP.md`.
