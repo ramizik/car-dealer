@@ -10,6 +10,7 @@ import brain  # noqa: E402
 import dealer_memory  # noqa: E402
 import dealer_profile  # noqa: E402
 import loop  # noqa: E402
+import swarm  # noqa: E402
 import memory  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
 
@@ -23,7 +24,33 @@ class RunReq(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "demo_mode": True, "brain_enabled": True, "sandboxed": False,
+            "shift_running": swarm.running(), "dealer_name": "Joe's Auto"}
+
+
+class ShiftReq(BaseModel):
+    max_deals: int = 5
+
+
+@app.post("/shift/start")
+async def shift_start(req: ShiftReq = ShiftReq()):
+    return {"started": swarm.start(max(1, min(req.max_deals, 20)))}
+
+
+@app.post("/shift/stop")
+def shift_stop():
+    swarm.stop()
+    return {"stopped": True}
+
+
+@app.get("/deals")
+def deals():
+    return swarm.public_deals()
+
+
+@app.get("/events")
+def events(since: int = 0):
+    return swarm.EVENTS[since:]
 
 
 @app.post("/run")
@@ -43,9 +70,10 @@ class DecisionReq(BaseModel):
 
 
 @app.post("/deals/{deal_id}/approve")
-def decide(deal_id: str, req: DecisionReq):
+async def decide(deal_id: str, req: DecisionReq):
     """Save the dealer's answer so the team acts on it next time, even if this deal is not in memory yet."""
     dealer_memory.record(req.car or deal_id, req.yes, req.reason)
+    await swarm.approve(deal_id, req.yes, req.reason)
     return {"ok": True, "deal_id": deal_id, "saved": True}
 
 
