@@ -7,9 +7,14 @@
 
 ## 1. One-liner
 
-A small used-car lot installs **Dealer** on its own machine. Overnight, a team of sandboxed agents (running under NVIDIA NemoClaw and OpenShell, powered by Nemotron on Crusoe) finds cars on public marketplaces and auctions using You.com, values them with cited research, negotiates with sellers, buys and ships the car once the owner approves by phone, then lists it on the dealer's own channels and negotiates the sale. Each conversation and each outcome goes into a **shared brain**, so tomorrow's team negotiates better than today's.
+A **large used-car dealership** runs **Dealer** as a local swarm. Two teams share one brain:
 
-**Pitch line:** *"Your best buyer never sleeps, never forgets a seller, and never touches a website you didn't approve."*
+- **Buy swarm** — continuously watches Kelley Blue Book comps, Facebook Marketplace, Craigslist, Autotrader, auctions and classifieds (via You.com), values cars, talks to people who want to sell, and only buys after the GM approves.
+- **Sell swarm** — keeps a dealer profile / listing pack on every channel we demo, talks to people who want to buy, asks qualifying questions, and closes above floor.
+
+Each conversation and each outcome goes into the **shared brain**, so the next scout, the next counter, and the next buyer Q&A are sharper.
+
+**Pitch line:** *"Your floor never sleeps. It hunts inventory, talks to sellers and buyers, and never forgets what worked."*
 
 ---
 
@@ -26,8 +31,8 @@ What the track asks for, and how we answer it:
 
 | Track requirement | Our answer |
 |---|---|
-| Every agent reads before work | `brain.recall(task)` is the first call in every agent function. The recalled lines appear in the UI next to each agent action. |
-| Every agent updates after work | `brain.write(...)` is the last call. Each write is an append-only event with agent, source and confidence. |
+| Every agent reads before work | First call: own `SKILL.md` + top mistakes, then `brain.recall(task)`. Recalled chips + skill chips show in the UI. |
+| Every agent updates after work | Last calls: `brain.write(...)` and, on a miss, one line in that agent's `MISTAKES.md`. |
 | Lean | Hard caps per scope, a TTL on market prices, dedup by key, a character budget on recall (~1.5k chars), and a librarian agent that compacts the log. |
 | Conflict-free | Writes are events and never overwrites. A deterministic reducer merges them: counters add, observations aggregate to a median, facts resolve by confidence then time. Contradictions are flagged and never silently dropped. |
 | Measurable quality gain | Brain OFF vs brain ON on held-out scenarios. Section 8 has the details. |
@@ -36,57 +41,138 @@ What the track asks for, and how we answer it:
 
 ## 3. Problem
 
-Small independent dealers do everything by hand:
+A high-volume lot still runs buy and sell as human inboxes:
 
-- Hours every day scrolling marketplaces, auction run lists and classifieds for cars that fit their lot.
-- Valuing each car by gut feel or with a paid book tool.
-- Haggling with private sellers over text, one at a time.
-- Arranging transport, chasing paperwork, writing listings, answering buyer questions, haggling again.
-- What they learn (which sellers are flexible, which trims move, which phrasing gets calls) lives in one person's head and disappears between deals.
+- Staff scroll Facebook Marketplace, Craigslist, Autotrader, auctions and KBB comps all day, then lose the thread overnight.
+- Buyers text "is this still available?" and "what's your best price?" — answers are slow, inconsistent, and never written into a customer profile.
+- Sellers of trade-ins and private cars get one-off haggling. Nobody remembers that this wholesaler always folds after the second comp.
+- Listings are copy-pasted per site. Price and photos drift. The lot has no single "profile" of what it stocks and what it will pay.
+- What the desk learns lives in one closer's head. Night shift starts from zero.
 
-Big dealer groups have buying centres and data teams. Small lots have the owner and a phone.
+The swarm exists so **search, talk, qualify, list, and remember** keep running after the desk goes home.
 
 ---
 
 ## 4. Solution
 
-A **local, always-on agent team** that works for one dealership:
+One FastAPI swarm, **two pipelines**, one brain:
 
 ```
-SOURCE  ->  APPRAISE  ->  NEGOTIATE  ->  [OWNER APPROVES]  ->  BUY  ->  SHIP  ->  LIST  ->  SELL
-   \__________ every step reads the SHARED BRAIN first, writes to it after __________/
+BUY:   WATCH -> APPRAISE -> TALK TO SELLER -> [GM APPROVES] -> BUY -> SHIP
+SELL:  LIST ON CHANNELS -> TALK TO BUYER (qualify) -> CLOSE -> [GM APPROVES IF BELOW FLOOR]
+              \__________ every step reads the SHARED BRAIN first, writes to it after __________/
 ```
 
-- **Local:** runs on the dealer's own box inside an NVIDIA NemoClaw sandbox. Dealer data stays with the dealer.
-- **Always-on:** a "shift" keeps running after the dashboard closes. The owner walks away, then gets a briefing and approval requests on their phone (NemoClaw messaging channel).
-- **Safe by construction:** OpenShell decides what the agents can reach. Inference keys stay outside the sandbox. No money moves without an explicit owner "yes".
-- **Learns:** the brain stores what each conversation and each sale taught, and every agent uses it next time.
+- **Local / always-on / sandboxed:** same as before (NemoClaw + OpenShell). GM walks away; Concierge pings for YES/NO only.
+- **Continuous watch:** Scout does not run once. A shift loop re-queries sources on a timer (demo: every N seconds with cache). New listings that match the lot profile become deals.
+- **Talk to people:** Negotiator (buy-side) and Intake + Closer (sell-side) run multi-turn chats. They ask questions, do not dump a form.
+- **Marketplace presence:** Merchandiser maintains one **listing pack** (title, price, photos, VIN, disclosure) and "publishes" it to each channel card: dealer storefront, Facebook Marketplace-style, Craigslist-style, Autotrader-style. Same brain record, per-channel copy.
 
 ### Persona (for the demo)
 
-**Joe's Auto, Stockton CA.** 40-car lot. Buys trucks and Japanese SUVs, $12k to $30k, under 110k miles, clean title only, targets 15% gross margin. Joe says "never buy rebuilt titles, never pay over 92% of retail". Joe has no time.
+**Valley Motors, Stockton CA.** High-volume independent group, ~200-car lot + wholesale. Buys trucks, Japanese SUVs, and clean commuter cars, $8k to $45k, under 120k miles, **clean title only**. Targets **12–15% gross** retail, never pay over **92% of KBB/retail comps**. GM: "No rebuilt, no out-of-state titles without a desk check, no off-platform payment links."
+
+### What we search (and how — live vs simulated)
+
+| Source | Why | Live in the hackathon | Never in the hackathon |
+|---|---|---|---|
+| **Kelley Blue Book / book values** | Buy max and list price | You.com **Research** cited valuation ("KBB / typical listing range") written into `market` obs | Scraping kbb.com, unofficial KBB APIs |
+| **Facebook Marketplace** | Private-party inventory and retail demand | You.com **Search + Contents** for public Marketplace-indexed listings | Logging into Facebook, creating a real Page, messaging real sellers |
+| **Craigslist / Autotrader / Cars.com / auctions** | Same | You.com Search + Contents | Scraping sites that block bots |
+| **Dealer storefront** | Our sell-side profile | Our own React page + simulated channel cards | Real paid classifieds accounts |
+
+**Hard product rule:** we **never message a real person** and we **never create real third-party marketplace accounts**. Chats are a simulator wired to real (or cached) listing text. Channel "profiles" are listing packs we own. That is still the swarm judges see: watch → value → talk → list → sell, with memory.
+
+### Buyer / seller questions the agents actually ask
+
+**To a seller (buy swarm):** year/trim, miles, title status, accidents, how many keys, payoff, why selling, timeline, lowest number if we pick up this week.
+
+**To a buyer (sell swarm):** budget, must-have (cab, 4x4, seats), timeline, trade-in, financing vs cash, zip for delivery. Answers become a `party` profile (`buyer:{id}`) so the next message is not "is this still available?" on a loop.
 
 ---
 
-## 5. Agent team
+## 5. Agentic company (org chart)
 
-All agents are plain async Python functions in one backend. "Swarm" means several deals move through the pipeline at once, with many agent instances in parallel, not many services.
+This is a **company of agents**, not a flat list. One process, named bosses, platform workers.
 
-| Agent | Job | Reads from brain | Writes to brain | Model (Crusoe unless noted) | External tools |
-|---|---|---|---|---|---|
-| **Concierge** | Owner-facing assistant. Takes goals, sends briefings, relays approvals. | Dealer profile, open deals | Owner preferences said in chat, approve/reject decisions | Nemotron (via NemoClaw / OpenClaw runtime) | NemoClaw messaging channel (Telegram) |
-| **Scout** | Finds candidate cars on marketplaces, auctions and public listings. | Dealer profile (makes, price band, mileage cap, region), past rejections | Listing seen, source quality (which sites gave approvable cars) | Nemotron Nano (extraction) | **You.com Search API**, **You.com Contents API** |
-| **Appraiser** | Values the car with cited comps, flags known issues, scores the deal. | Market comps for this segment, days-to-sell stats | Price observations with source URLs, known-issue notes | Nemotron Super/Ultra (reasoning). Nano Omni for photos (stretch) | **You.com Research API** |
-| **Negotiator** | Talks to the seller and gets the lowest price at or under the dealer's max. | Counterparty memory (this seller and similar sellers), playbook stats, dealer max | Conversation summary, seller signals, tactic used and its outcome | Nemotron 3 Super (Ultra if enabled for our project) | Simulated seller channel |
-| **Logistics** | Buys after approval (simulated escrow), books transport, tracks delivery. | Shipping cost observations per route, carrier notes | Quote and actual cost, delays | Nemotron Nano | **You.com Search** for carrier rates |
-| **Merchandiser** | Writes the listing, sets the price, publishes it to the dealer's own channels. | "What sells" stats, comps, dealer margin target | Listing variant, list price | Nemotron Super | Dealer storefront page plus Telegram channel post (stretch) |
-| **Closer** | Handles buyer inquiries and negotiates the sale upward. | Buyer memory, playbook stats (sell side), floor price | Buyer signals, tactic outcome, final sale | Nemotron Super | Simulated buyer channel |
-| **Librarian** | Compacts the brain, resolves or flags conflicts, distils lessons. | Whole event log | Compacted views, conflict flags, lessons | Nemotron 3.5 Lightning (built for long-running sub-agents, 1M context) | None |
+```
+Owner Agent                          (GM: goals, YES/NO, who works which deal)
+│
+├── Buyer Agent                      (acquisition desk)
+│   ├── FB Marketplace buyer         (watch + talk on FB-indexed listings)
+│   ├── Craigslist buyer
+│   ├── Autotrader / auction buyer
+│   ├── KBB / book buyer             (You.com Research comps → max_buy)
+│   └── Logistics                    (simulated buy + ship)
+│
+└── Seller Agent                     (retail desk)
+    ├── Storefront seller            (our lot page)
+    ├── FB Marketplace seller        (FB-style listing pack + buyer chat)
+    ├── Craigslist seller
+    └── Autotrader seller
+```
+
+**Owner Agent** does not scrape or haggle. It assigns work, enforces policy, and is the only one that can approve a buy or a below-floor sell. It talks to the human GM (Telegram + dashboard).
+
+**Buyer Agent** owns inbound inventory. It dispatches the platform buyer that matches the listing source. It rolls up offers and asks Owner for YES.
+
+**Seller Agent** owns outbound inventory. It dispatches the platform seller that matches the channel the customer came from. Intake questions + close happen *on that platform agent*, so Facebook learnings stay on the Facebook seller.
+
+Same FastAPI process. "Several agents" = several functions + a queue, not several services.
+
+| Agent | Reports to | Platform | Job |
+|---|---|---|---|
+| **Owner Agent** | human GM | none | Brief, assign, approve, escalate conflicts |
+| **Buyer Agent** | Owner | all buy sources | Route listing → platform buyer, clamp `max_buy`, request approval |
+| **FB / CL / Autotrader buyer** | Buyer Agent | that site | Watch + multi-turn seller chat on that site's listings only |
+| **KBB / book buyer** | Buyer Agent | KBB-style comps | Cited valuation, issues, `max_buy` |
+| **Logistics** | Buyer Agent | carriers | Simulated escrow + transport |
+| **Seller Agent** | Owner | all sell channels | One listing pack → clone per channel, route buyer chats |
+| **Storefront / FB / CL / Autotrader seller** | Seller Agent | that channel | Qualify buyer, ask questions, close above floor |
+| **Librarian** | Owner | brain + skills | Compact events, promote repeated mistakes into skills |
+
+### 5.1 Per-agent skill + mistake files
+
+Every agent has **its own skill folder**. Company facts stay in the shared brain. Craft and failures stay on the worker that made them, so Facebook's "don't open off-platform links" does not bloat the Craigslist seller prompt.
+
+```
+backend/skills/
+  owner/SKILL.md              owner/MISTAKES.md
+  buyer/SKILL.md              buyer/MISTAKES.md
+  buyer.fb/SKILL.md           buyer.fb/MISTAKES.md
+  buyer.craigslist/SKILL.md   buyer.craigslist/MISTAKES.md
+  buyer.autotrader/SKILL.md   buyer.autotrader/MISTAKES.md
+  buyer.kbb/SKILL.md          buyer.kbb/MISTAKES.md
+  seller/SKILL.md             seller/MISTAKES.md
+  seller.fb/SKILL.md          seller.fb/MISTAKES.md
+  ...
+```
+
+| File | What goes in | Cap (lean) |
+|---|---|---|
+| `SKILL.md` | How *this* agent works this platform: search recipe, talk script, disclosure, what to write to the brain | ~800 chars. Owner/Librarian may rewrite only if a mistake repeats. |
+| `MISTAKES.md` | Dated bullets: what went wrong, what to do instead, `hits` count | 20 bullets. Newest + highest hits. Dedup by normalised text. |
+
+**Read-before / write-after (every worker):**
+
+1. Read own `SKILL.md` + top 5 `MISTAKES.md` lines (hard char cap).
+2. `brain.recall(...)` for company facts only (dealer policy, this party, this segment) — **not** other agents' skills.
+3. Do the work.
+4. `brain.write(...)` for facts/counters.
+5. If the outcome was a miss (bad offer, scam link, rejected by Owner, buyer ghosted after a dumb question): **append one mistake line**. If it was a repeat win: optionally one line into `SKILL.md` playbook, still under the cap.
+
+Owner Agent can read **summaries** of child mistake files (Librarian packs them), never the raw union of every skill — that would blow the token budget.
+
+This is still **Shared Brain**, not Version N+1. Skills are memory the agent owns. We do not pitch "we rewrote the system prompt." We show the mistake file grow on screen.
+
+**Demo beat:** FB buyer clicks a scam payment link → OpenShell blocks → `buyer.fb/MISTAKES.md` gets `off-platform payment URL; flag party; never fetch`. Next FB listing with a similar link: Recalled chip shows that mistake. Craigslist buyer never sees it.
 
 **Hard rules enforced in code, not by prompts:**
 - An offer is never above `dealer.max_buy` for that car. It is clamped before sending.
-- Buy and sell commitments create an `approval_request`. Nothing executes until the owner approves.
+- A sell is never below `dealer.floor` without an `approval_request`.
+- Buy and sell commitments create an `approval_request`. Nothing executes until the GM approves.
 - Every outbound message to a seller or buyer carries an AI-assistant disclosure line.
+- Watcher never follows off-allowlist links (OpenShell). Scam payment URLs are red-flagged on `party`.
 
 ---
 
@@ -134,11 +220,12 @@ The UI shows **"Recalled:"** chips under every agent action, so the audience can
 - Recall budget: about 1,500 characters per agent call, ranked by key match, then confidence, then recency.
 - Librarian compaction runs every N deals. Brain size is shown in the UI before and after compaction.
 
-### 6.5 Self-improvement through the brain
+### 6.5 Self-improvement through the brain **and** per-agent skills
 
-- **Playbook learning:** the negotiator picks a tactic for the seller's segment from the playbook counters (best win rate, with some exploration). With the brain off it picks a default. Over time the team learns, for example, that "motivated" private sellers fold to *fast cash pickup* while "price-anchored" sellers fold to *cite three comps*.
-- **Preference learning:** each owner approve or reject updates `dealer` notes. The scout's filter tightens, so the approval rate goes up.
-- **Counterparty memory:** repeat sellers (wholesalers, auction consignors) are remembered. Last time's floor becomes this time's opening anchor.
+- **Playbook (company):** Buyer/Seller leads pick tactics from `playbook` counters. Brain OFF → default tactic. Brain ON → best win rate with a little exploration.
+- **Mistake skills (per platform):** a miss writes to that agent's `MISTAKES.md`. Repeats increment `hits`. Librarian promotes a high-hit mistake into that agent's `SKILL.md` and may copy a *dealer-policy* fact into the company brain (example: "never follow off-platform pay links" as a `dealer` note). Platform-specific craft stays in the skill file.
+- **Preference learning:** Owner YES/NO updates `dealer` notes. Watchers on every buy platform tighten.
+- **Counterparty memory:** `party` records are company-wide. The FB buyer and the FB seller both see that this person sent a scam link.
 
 ---
 
@@ -192,8 +279,9 @@ We will present only the numbers we actually measure. If the gain is small, we s
   |                 |                                                                |
   |   +------------ OpenShell sandbox "dealer" (network policy: allowlist only) ---+ |
   |   |  OpenClaw Concierge  --skill-->  Dealer API (FastAPI)                      | |
-  |   |                                     |-- swarm.py  (shift loop, deal queue) | |
-  |   |                                     |-- agents.py (scout ... librarian)    | |
+  |   |                                     |-- swarm.py  (owner → buyer/seller leads) |
+  |   |                                     |-- agents.py (platform workers)       | |
+  |   |                                     |-- skills/   (SKILL.md + MISTAKES.md) | |
   |   |                                     |-- brain.py  (events.jsonl -> views)  | |
   |   |                                     |-- sim.py    (sellers / buyers / owner)| |
   |   |                                     |-- youcom.py (search/contents/research + cache)
@@ -217,11 +305,11 @@ We will present only the numbers we actually measure. If the gain is small, we s
 | 0:00 | **Hook** | "Joe runs a 40-car lot alone. Last night his agents bought him a truck." Phone shows the overnight briefing. |
 | 0:20 | **Local and sandboxed** | Terminal: `nemoclaw list` shows the `dealer` sandbox. One sentence: runs on Joe's machine, Nemotron on Crusoe, keys held by OpenShell. |
 | 0:35 | **Start a shift** | Dashboard: Joe's profile comes from the brain. Click **Start shift** (or text "go find me Tacomas" on Telegram). |
-| 0:50 | **Live sourcing** | Scout feed fills with **real** listings from You.com Search. Appraiser card shows a **cited** You.com Research valuation. |
-| 1:15 | **Negotiation with memory** | Split view: chat with a simulated seller next to **Recalled:** chips ("motivated sellers: fast-cash pickup wins 7/9", "Joe's max on this car: $18.4k"). The offer lands. |
+| 0:50 | **Live sourcing** | Watcher feed ticks: Facebook Marketplace / CL / Autotrader hits via You.com. Appraiser card shows a **cited** KBB-style You.com Research valuation and a clamped `max_buy`. |
+| 1:15 | **Buy-side talk with memory** | Owner assigned the deal to **Buyer Agent → FB buyer**. Split view: seller chat + Recalled chips + that agent's `MISTAKES.md` line. Offer lands under `max_buy`. |
 | 1:45 | **Scam blocked** | Another seller sends a "payment verification" link. The agent tries to open it and **OpenShell blocks it**. The block shows in the operator view, and a red flag appears on that seller in the Brain tab. |
 | 2:05 | **Owner approves from phone** | Telegram: "Approve $17,900?" The owner replies YES. Pipeline card moves to Bought, then In transit, with a shipping quote from You.com search. |
-| 2:20 | **Sell side** | Merchandiser publishes the listing to Joe's storefront page. A simulated buyer haggles and the Closer sells above the target margin. |
+| 2:20 | **Sell side** | Merchandiser clones one listing pack onto storefront + FB/CL-style channel cards. Intake asks the buyer budget/needs; Closer sells above floor using `buyer:{id}` memory. |
 | 2:35 | **The proof** | Eval tab: brain OFF vs ON on 10 held-out deals. Headline: surplus captured X% vs Y% (measured live earlier). Brain tab: lessons learned, conflicts flagged, size kept lean. |
 | 2:55 | **Close** | "A dealership's memory, run by agents, on the dealer's own machine." |
 
@@ -248,8 +336,9 @@ We will present only the numbers we actually measure. If the gain is small, we s
 - Real, visible use of NemoClaw, OpenShell, Nemotron on Crusoe, and You.com Search, Contents and Research.
 
 **Non-goals**
-- Real purchases, real payments, real contact with sellers, title and DMV paperwork.
-- Scraping sites that block bots. If You.com doesn't return a listing, we don't chase it.
+- Real purchases, real payments, real contact with sellers or buyers, title and DMV paperwork.
+- Real Facebook / Craigslist / Autotrader accounts, logins, or posts. Channel "profiles" are our listing packs on simulated cards plus our storefront.
+- Scraping KBB, Facebook, or any site that blocks bots. If You.com doesn't return it, we cache or skip.
 - Multi-dealer or multi-tenant support, auth, a database.
 - Vector DB or embeddings. Key and tag recall is enough and easier to explain.
 
