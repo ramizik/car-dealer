@@ -22,7 +22,7 @@ import httpx
 
 PATH = Path(__file__).parent / "data" / "vectors" / "memories.jsonl"
 API_URL = os.getenv("VECTOR_EMBED_URL", "https://integrate.api.nvidia.com/v1/embeddings")
-MODEL = os.getenv("VECTOR_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5")
+MODEL = os.getenv("VECTOR_EMBED_MODEL", "nvidia/nemotron-3-embed-1b")
 HASH_DIM = 256
 
 _lock = threading.Lock()

@@ -17,7 +17,7 @@ import wave
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 SERVER = os.getenv("NVIDIA_SPEECH_SERVER", "grpc.nvcf.nvidia.com:443")
-ASR_MODEL = os.getenv("NVIDIA_ASR_MODEL", "parakeet-ctc-1_1b-asr")  # NVCF name without the "ai-" prefix
+ASR_MODEL = os.getenv("NVIDIA_ASR_MODEL", "parakeet-tdt-0_6b-v2")  # NVCF name without the "ai-" prefix
 TTS_MODEL = os.getenv("NVIDIA_TTS_MODEL", "magpie-tts-multilingual")
 VOICE = os.getenv("NVIDIA_TTS_VOICE", "Magpie-Multilingual.EN-US.Aria")  # any name from --list-voices; format model.locale.speaker
 
