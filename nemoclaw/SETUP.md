@@ -127,22 +127,46 @@ Decision: no Telegram. The owner approves or rejects in the React dashboard (App
 
 ## 3.A1 Scam rehearsal (the OpenShell moment)
 
-The simulated scammer seller (`backend/sim.py`, persona `scammer`) sends a link on a reserved test domain (`secure-escrow-payments.example`). Nothing real is ever contacted.
+The simulated scammer seller (`backend/sim.py`, persona `scammer`) sends a link on a reserved test domain (`secure-escrow-payments.example`). Nothing real is ever contacted. In `DEMO_MODE=1` an affordable scammer is always among the first deals of a shift.
 
-1. Start a shift that includes a scammer scenario.
-2. Ask the concierge (`nemoclaw dealer agent --agent main -m "..."`): "the seller sent a payment link, check it".
-3. The request is blocked: `openshell term` shows a pending rule for the domain. Press `x`.
-4. Dashboard: a red `blocked` row. Brain tab: a `red_flag` on that seller. `backend/skills/buyer/outreach/MISTAKES.md` gets a dated line.
+1. Start a shift (dashboard or concierge). Find the scam deal id: the red `blocked` row in the feed.
+2. Ask the concierge in the `main` session (fresh `--session-id` sessions may skip the skill). Passed 2026-10-17 with this exact wording:
+   ```bash
+   nemoclaw dealer agent --agent main -m "Use your dealer-concierge skill. Deal D-205: the seller sent https://secure-escrow-payments.example/pay?id=S-205 . Try to open it once with curl. If the sandbox blocks it, record the red flag with the flag command from the skill, then tell me what happened."
+   ```
+   Reply: "sandbox blocked it. Recorded red flag via `/deals/D-205/flag`". Backend log shows `POST /deals/D-205/flag` from `172.18.0.2` (the sandbox).
+3. `openshell term` shows the denied domain. Press `x`.
+4. Dashboard: a red `blocked` row from `concierge` ("checked from the NemoClaw sandbox"). Brain tab: `red_flag` on that seller.
 
-Repeat 3 times before the demo.
+Crusoe is 30 RPM per model: leave about 60 s between concierge prompts or the agent answers "API rate limit reached".
+
+## 3.A3 Morning briefing
+
+```bash
+nemoclaw dealer agent --agent main -m "What happened overnight?"
+```
+
+Passed 2026-10-17: the concierge called `GET /briefing` from the sandbox and answered "4 deals worked, ... 1 scam blocked, 1 waiting for your OK: D-203."
 
 ## 3.A4 Terminal beauty shot
 
 ```bash
-nemoclaw list
-nemoclaw dealer policy list
-openshell term
+bash /root/dealer/nemoclaw/beauty.sh   # sandboxes, health probe, applied presets, allowed vs BLOCKED from inside, briefing
+openshell term                         # second pane: live network decisions
 ```
+
+## Gateway down ("gateway 'nemoclaw' is not reachable")
+
+The OpenShell gateway is a systemd **user** service. Without linger, root's user manager stops when the last SSH session closes and takes the gateway with it. Fixed on the droplet with `loginctl enable-linger root` (2026-10-17). If it is down anyway (reboot, crash):
+
+```bash
+export XDG_RUNTIME_DIR=/run/user/0
+systemctl --user restart nemoclaw-openshell-gateway
+openshell sandbox list                 # dealer must be Ready
+nemoclaw dealer connect --probe-only   # restarts the OpenClaw gateway inside the sandbox if needed
+```
+
+Source: NemoClaw troubleshooting, "Reconnect after a host reboot" (https://docs.nvidia.com/nemoclaw/latest/user-guide/openclaw/reference/troubleshooting).
 
 ## Teardown
 

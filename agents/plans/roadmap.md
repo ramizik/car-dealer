@@ -113,7 +113,7 @@ Step IDs keep their original lane letter (A/B/C/D) so history stays readable. A 
 
 ### Lane A: NemoClaw sandbox up
 
-_**Live (2026-10-17):** DigitalOcean droplet, sandbox `dealer` (OpenClaw) on Crusoe `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B` via compatible-endpoint; agent answers through `inference.local`. Presets applied: `dealer-apis` (You.com), `dealer-api-host` (backend at private IP 10.120.0.2:8000, `host.openshell.internal` was rejected as internal). Skill `dealer-concierge` installed and ready. Checked from inside the sandbox: backend port returns 200, the scam domain is blocked. Plan A/B decision: backend runs on the droplet host and only the concierge is sandboxed. Backend deployed on the droplet (`/root/dealer`, `.venv`, `DEMO_MODE=1`, bound to 10.120.0.2:8000, log at `/root/backend.log`). **End-to-end check passed:** the concierge in the sandbox, running Nemotron, called `POST /shift/start` and `GET /deals` and answered "2 deals awaiting approval". Remaining: scam rehearsal (3.A1), terminal beauty shot (3.A4), and exposing the dashboard (run the frontend against the droplet or tunnel the API)._
+_**Live (2026-10-17):** DigitalOcean droplet, sandbox `dealer` (OpenClaw) on Crusoe `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B` via compatible-endpoint; agent answers through `inference.local`. Presets applied: `dealer-apis` (You.com), `dealer-api-host` (backend at private IP 10.120.0.2:8000, `host.openshell.internal` was rejected as internal). Skill `dealer-concierge` installed and ready. Checked from inside the sandbox: backend port returns 200, the scam domain is blocked. Plan A/B decision: backend runs on the droplet host and only the concierge is sandboxed. Backend deployed on the droplet (`/root/dealer`, `.venv`, `DEMO_MODE=1`, bound to 10.120.0.2:8000, log at `/root/backend.log`). **End-to-end check passed:** the concierge in the sandbox, running Nemotron, called `POST /shift/start` and `GET /deals` and answered "2 deals awaiting approval". 3.A1 scam rehearsal, 3.A3 briefing and 3.A4 beauty shot passed on the droplet (see `nemoclaw/SETUP.md`). Gateway linger enabled so the sandbox survives SSH disconnects. Remaining: exposing the dashboard (run the frontend against the droplet or tunnel the API)._
 
 _Repo side done: `nemoclaw/SETUP.md` (runbook, docs-checked commands), `nemoclaw/presets/dealer-apis.yaml` (You.com egress), `nemoclaw/presets/dealer-api-host.yaml` (Plan B host API), `nemoclaw/skills/dealer/SKILL.md` (concierge, name `dealer-concierge`). Host side blocked on: WSL2 Ubuntu install (admin and reboot), the Crusoe key in the onboarding shell, and a Telegram bot token from @BotFather. The concierge also needs the B endpoints `/shift/*`, `/deals/*`, `/briefing` and `PUT /dealer`._
 
@@ -216,29 +216,29 @@ Not connected yet (original list, mostly superseded):
 
 | Done | # | Step |
 |---|---|---|
-| [ ]  3.C1 | **Shift tab, left:** live event feed (poll `/events?since=`) with an agent icon or colour, model badge, and **red rows for `blocked`**. |
-| [ ]  3.C2 | **Shift tab, right:** pipeline columns by deal state. Cards show car, price, margin, and an **Approve / Reject** button when `awaiting_approval`. |
-| [ ]  3.C3 | **Deal drawer** (click a card): seller chat bubbles. Under each agent message, **"Recalled:" chips** taken from that turn's `recall` events. Valuation card with **You.com citations as links**. Tactic used. |
-| [ ]  3.C4 | **Brain tab:** 4 columns (Dealer / Parties / Market / Playbook). Playbook table shows win rate per tactic × segment. **Conflicts panel. Lean meter** (events, KB, before/after compaction). Snapshot buttons `cold` / `warm`. |
-| [ ]  3.C5 | **Eval tab:** paired bars, OFF vs ON, for each metric (plain CSS bars, no chart library). Headline number large. Per-scenario table underneath. "Re-run" button. |
-| [ ]  3.C6 | Empty, loading and error states for every panel. A wording pass on labels. |
+| [x]  3.C1 | **Shift tab, left:** live event feed (poll `/events?since=`) with an agent icon or colour, model badge, and **red rows for `blocked`**. |
+| [x]  3.C2 | **Shift tab, right:** pipeline columns by deal state. Cards show car, price, margin, and an **Approve / Reject** button when `awaiting_approval`. |
+| [x]  3.C3 | **Deal drawer** (click a card): seller chat bubbles. Under each agent message, **"Recalled:" chips** taken from that turn's `recall` events. Valuation card with **You.com citations as links**. Tactic used. |
+| [x]  3.C4 | **Brain tab:** 4 columns (Dealer / Parties / Market / Playbook). Playbook table shows win rate per tactic × segment. **Conflicts panel. Lean meter** (events, KB, before/after compaction). Snapshot buttons `cold` / `warm`. |
+| [x]  3.C5 | **Eval tab:** paired bars, OFF vs ON, for each metric (plain CSS bars, no chart library). Headline number large. Per-scenario table underneath. "Re-run" button. |
+| [x]  3.C6 | Empty, loading and error states for every panel. A wording pass on labels. |
 
 ### Lane A: Make the NVIDIA moments reliable
 
 | Done | # | Step |
 |---|---|---|
-| [ ]  3.A1 | Scam rehearsal: start a shift with a seeded `scammer` seller. Confirm (a) the OpenShell operator view shows the blocked domain, (b) the dashboard shows a red `blocked` row, (c) the Brain tab shows the red flag. The domain is under a reserved test TLD (for example `secure-escrow-verify.example.net`), so nothing real is contacted. |
+| [x]  3.A1 | Scam rehearsal: start a shift with a seeded `scammer` seller. Confirm (a) the OpenShell operator view shows the blocked domain, (b) the dashboard shows a red `blocked` row, (c) the Brain tab shows the red flag. The domain is under a reserved test TLD (for example `secure-escrow-verify.example.net`), so nothing real is contacted. |
 | [cut]  3.A2 | **Cut: rehearse dashboard approval instead.** Phone approval rehearsal: approval message arrives on Telegram, "YES D-xxx" advances the deal, and the dashboard updates. |
-| [ ]  3.A3 | Morning briefing: the concierge answers "what happened overnight?" using `GET /briefing`. |
-| [ ]  3.A4 | Terminal "beauty shot" for the pitch: `nemoclaw list` + `nemoclaw dealer policy list` + the operator view, in one tidy terminal layout. |
-| [ ]  3.A5 | **Stretch (only if all above is solid):** Nano Omni photo check in `appraise` (send listing photo URLs, get condition flags), **or** a local Nemotron route for private dealer data. Pick one and timebox to 30 minutes. |
+| [x]  3.A3 | Morning briefing: the concierge answers "what happened overnight?" using `GET /briefing`. |
+| [x]  3.A4 | Terminal "beauty shot" for the pitch: `nemoclaw list` + `nemoclaw dealer policy list` + the operator view, in one tidy terminal layout. |
+| [cut]  3.A5 | **Cut: seed and cached listings carry no photo URLs, so a photo check would be invisible on stage.** **Stretch (only if all above is solid):** Nano Omni photo check in `appraise` (send listing photo URLs, get condition flags), **or** a local Nemotron route for private dealer data. Pick one and timebox to 30 minutes. |
 
 ### Lane D: Real-data polish
 
 | Done | # | Step |
 |---|---|---|
-| [~]  3.D1 | Pre-warm the You.com cache for the exact demo queries (Joe's profile: Tacoma, 4Runner, RAV4, Tundra near Stockton). |
-| [ ]  3.D2 | Check 3 Research valuations by hand against their cited sources. Fix the extraction prompt if numbers drift. |
+| [x]  3.D1 | Pre-warm the You.com cache for the exact demo queries (Joe's profile: Tacoma, 4Runner, RAV4, Tundra near Stockton). _Live shift on a throwaway brain cached appraisal, VIN, shipping and comps queries for every seed car (cache 50 -> 60 files, 10/10 deals with citations); `data/cache` copied to the droplet (git-ignored)._ |
+| [x]  3.D2 | Check 3 Research valuations by hand against their cited sources. Fix the extraction prompt if numbers drift. _Checked 2008 RAV4 117k ($4.4k-8k, KBB), 2001 Tacoma 226k ($3.5k-6.5k, KBB/Edmunds), 2002 RAV4 144k (~$2.5k, Edmunds): numbers match sources, but sim asks sit above them. Fix: when the cited mid is >25% off the deal comps, the drawer shows it as an independent check plus "asking above cited range", and prices stay on sim numbers._ |
 
 **Gate P3 (T+3:45):** someone outside the team watches one full shift on the dashboard and can describe what the brain did.
 
