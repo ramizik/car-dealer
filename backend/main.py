@@ -159,6 +159,27 @@ class DecisionReq(BaseModel):
     reason: str = ""
 
 
+class FlagReq(BaseModel):
+    reason: str = "Blocked by OpenShell policy"
+    url: str = ""
+
+
+@app.post("/deals/{deal_id}/flag")
+def flag(deal_id: str, req: FlagReq):
+    """Concierge (in the sandbox) reports a link it could not open. Becomes a red flag every agent recalls."""
+    deal = swarm.DEALS.get(deal_id)
+    sc = swarm._SC.get(deal_id) or {}
+    party = f"seller:{(sc.get('seller') or {}).get('sid', deal_id)}"
+    host = req.url.split("/")[2] if req.url.count("/") >= 2 else req.url
+    brain.write("concierge", "party", party, "fact", True, attr="red_flag", confidence=0.9, source=f"openshell:{host or deal_id}")
+    swarm.emit("concierge", "blocked", f"{req.reason}: {host or 'seller link'} (checked from the NemoClaw sandbox)",
+               {"deal_id": deal_id, "url": req.url})
+    if deal and deal["state"] not in ("dropped", "sold"):
+        deal.update(state="dropped", drop_reason=f"red flag: {req.reason}")
+    swarm.save()
+    return {"ok": True, "deal_id": deal_id, "party": party}
+
+
 @app.post("/deals/{deal_id}/approve")
 async def decide(deal_id: str, req: DecisionReq):
     """Save the dealer's answer so the team acts on it next time, even if this deal is not in memory yet."""

@@ -29,6 +29,12 @@ Run all night ("keep working", "run until I stop you"): `"max_deals": 0` keeps s
 
 Public listings page the team publishes: `curl -s http://10.120.0.2:8000/storefront`
 
+Record a red flag after the sandbox blocks a link (use the real deal id and the link you tried):
+
+```bash
+curl -s -X POST http://10.120.0.2:8000/deals/D-201/flag   -H 'Content-Type: application/json' -d '{"reason": "Blocked by OpenShell policy", "url": "https://secure-escrow-payments.example/pay"}'
+```
+
 Stop the shift:
 
 ```bash
