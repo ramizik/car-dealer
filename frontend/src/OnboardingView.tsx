@@ -14,9 +14,9 @@ export default function OnboardingView() {
   const [saved, setSaved] = useState(true);
 
   useEffect(() => {
-    api.onboardingQuestions().then((r) => {
-      setQuestions(r.data);
-      setOffline(r.offline);
+    api.onboardingQuestions().then((q) => {
+      setQuestions(q);
+      setOffline(q.length === 0);
       setLoaded(true);
     });
   }, []);

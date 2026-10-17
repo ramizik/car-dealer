@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import * as fx from "./fixtures";
 import BrainView from "./BrainView";
 import DealPanel from "./DealPanel";
 import DealsList, { type Column, type Filter } from "./DealsList";
 import EvalView from "./EvalView";
-import HomeView from "./HomeView";
+import ShiftView from "./ShiftView";
 import MoneyView from "./MoneyView";
 import OnboardingView from "./OnboardingView";
 import { money, profit, stageLabel } from "./format";
@@ -14,7 +13,7 @@ import type { AgentEvent, Brain, Deal, EvalResult, Health } from "./types";
 type Section = "home" | "buying" | "inventory" | "selling" | "team" | "setup";
 
 const NAV: { id: Section; label: string; icon: string; mobile: boolean }[] = [
-  { id: "home", label: "Home", icon: "⌂", mobile: true },
+  { id: "home", label: "Shift", icon: "◉", mobile: true },
   { id: "buying", label: "Buying", icon: "⇣", mobile: true },
   { id: "inventory", label: "Inventory", icon: "▦", mobile: true },
   { id: "selling", label: "Selling", icon: "⇡", mobile: true },
@@ -24,24 +23,24 @@ const NAV: { id: Section; label: string; icon: string; mobile: boolean }[] = [
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
-  const [teamTab, setTeamTab] = useState<"money" | "memory" | "results">("money");
-  const [health, setHealth] = useState<Health>(fx.health);
-  const [deals, setDeals] = useState<Deal[]>(fx.deals);
-  const [events, setEvents] = useState<AgentEvent[]>(fx.events);
-  const [brain, setBrain] = useState<Brain>(fx.brain);
-  const [evalResult, setEvalResult] = useState<EvalResult>(fx.evalResult);
+  const [teamTab, setTeamTab] = useState<"money" | "memory" | "results">("memory");
+  // Everything on screen comes from the backend. Nothing is shown until it answers.
+  const [health, setHealth] = useState<Health | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [brain, setBrain] = useState<Brain | null>(null);
+  const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
   const [offline, setOffline] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
   const refresh = async () => {
     const [h, d, e, b, r] = await Promise.all([api.health(), api.deals(), api.events(), api.brain(), api.eval()]);
-    // Only replace what the backend actually served; anything missing keeps the current (sample) data.
-    setOffline(h.offline || d.offline);
-    if (!h.offline) setHealth(h.data);
-    if (!d.offline) setDeals(d.data);
-    if (!e.offline) setEvents(e.data);
-    if (!b.offline) setBrain(b.data);
-    if (!r.offline) setEvalResult(r.data);
+    setOffline(h === null);
+    setHealth(h);
+    if (d) setDeals(d);
+    if (e) setEvents(e);
+    if (b) setBrain(b);
+    if (r) setEvalResult(r);
   };
 
   useEffect(() => {
@@ -52,35 +51,26 @@ export default function App() {
 
   const decide = async (id: string, yes: boolean) => {
     // The dealer's answer is saved so the team acts on it next time.
-    const ok = await api.approve(id, yes, deals.find((d) => d.id === id)?.car ?? "");
-    if (!ok) {
-      // Offline: reflect the choice locally so the screen still responds.
-      setDeals((ds) =>
-        ds.map((d) =>
-          d.id === id
-            ? yes
-              ? { ...d, state: "bought", bought_for: d.offer }
-              : { ...d, state: "dropped", drop_reason: "Declined by you" }
-            : d,
-        ),
-      );
-    }
+    await api.approve(id, yes, deals.find((d) => d.id === id)?.car ?? "");
     refresh();
   };
 
-  const toggleShift = async () => {
-    const running = health.shift_running;
-    await (running ? api.stopShift() : api.startShift());
-    setHealth((h) => ({ ...h, shift_running: !running }));
+  const startShift = async (n: number) => {
+    await api.startShift(n);
+    refresh();
   };
+  const stopShift = async () => {
+    await api.stopShift();
+    refresh();
+  };
+  const toggleShift = () => (health?.shift_running ? stopShift() : startShift(5));
 
   const go = (s: Section) => {
     setSection(s);
     window.scrollTo({ top: 0 });
   };
 
-  const running = Boolean(health.shift_running);
-  const dealer = health.dealer_name ?? "your dealership";
+  const running = Boolean(health?.shift_running);
   const open = deals.find((d) => d.id === openId);
   const needs = deals.filter((d) => d.state === "awaiting_approval").length;
   const badge: Partial<Record<Section, number>> = { home: needs, buying: needs };
@@ -156,8 +146,8 @@ export default function App() {
         <div className="brand">
           <span className="logo" aria-hidden="true">D</span>
           <div>
-            <strong>{health.dealer_name ?? "Your dealership"}</strong>
-            <span className="muted small">Dealer account</span>
+            <strong>{health?.dealer_name ?? "Your dealership"}</strong>
+            <span className="muted small">{!health ? "Backend offline" : health.llm_live ? "Live on Nemotron" : "LLM mock mode"}</span>
           </div>
         </div>
         <nav>
@@ -172,34 +162,35 @@ export default function App() {
         <div className="team-card">
           <span className={`status ${running ? "on" : ""}`} role="status">
             <i aria-hidden="true" />
-            {running ? "Buying is on" : "Buying is paused"}
+            {running ? `Shift running · ${health?.shift?.n ?? 0}/${health?.shift?.cap ?? 0}` : "No shift running"}
           </span>
-          <button className={running ? "" : "primary"} onClick={toggleShift}>
-            {running ? "Pause buying" : "Start buying"}
+          <button className={running ? "" : "primary"} onClick={toggleShift} disabled={!health}>
+            {running ? "Stop shift" : "Start shift"}
           </button>
         </div>
       </aside>
 
       <div className="main">
         <header className="mobile-top">
-          <strong>{health.dealer_name ?? "Your dealership"}</strong>
+          <strong>{health?.dealer_name ?? "Your dealership"}</strong>
           <div className="row">
-            <span className={`status ${running ? "on" : ""}`}><i aria-hidden="true" />{running ? "Buying on" : "Paused"}</span>
+            <span className={`status ${running ? "on" : ""}`}><i aria-hidden="true" />{running ? "Shift on" : "Idle"}</span>
             <button className="quiet" onClick={() => go("setup")}>Setup</button>
           </div>
         </header>
 
         {offline && (
           <div className="banner" role="alert">
-            <span>Showing sample data. We can't reach the server, so changes here aren't saved.</span>
+            <span>Can't reach the backend. Nothing below is live until it answers.</span>
             <button onClick={refresh}>Try again</button>
           </div>
         )}
 
         <main className="content">
           {section === "home" && (
-            <HomeView dealer={dealer} deals={deals} events={events} running={running} onToggle={toggleShift}
-              onOpen={setOpenId} onDecide={decide} onGo={go} />
+            <ShiftView health={health} deals={deals} events={events} brain={brain} evalResult={evalResult}
+              onStart={startShift} onStop={stopShift} onOpen={setOpenId} onDecide={decide}
+              onInsights={() => { setTeamTab("results"); go("team"); }} />
           )}
           {section === "buying" && (
             <DealsList title="Buying" intro="Cars we found, valued and are negotiating. We check resale price and profit before any buy."
@@ -217,19 +208,19 @@ export default function App() {
             <div className="stack">
               <header className="page-head">
                 <h1>Insights</h1>
-                <p>What you're making on each car, and what we've learned from your deals.</p>
+                <p>The shared brain every agent reads before work and writes after, and what it measurably changes.</p>
               </header>
               <div className="seg seg-lg" role="group" aria-label="Insights view">
+                <button aria-pressed={teamTab === "memory"} onClick={() => setTeamTab("memory")}>Shared brain</button>
+                <button aria-pressed={teamTab === "results"} onClick={() => setTeamTab("results")}>Brain off vs on</button>
                 <button aria-pressed={teamTab === "money"} onClick={() => setTeamTab("money")}>Money</button>
-                <button aria-pressed={teamTab === "memory"} onClick={() => setTeamTab("memory")}>What we've learned</button>
-                <button aria-pressed={teamTab === "results"} onClick={() => setTeamTab("results")}>Performance</button>
               </div>
               {teamTab === "money" ? (
                 <MoneyView deals={deals} />
               ) : teamTab === "memory" ? (
                 <BrainView brain={brain} onSnapshot={(n) => api.loadSnapshot(n).then(refresh)} />
               ) : (
-                <EvalView result={evalResult} onRun={() => api.runEval().then(refresh)} />
+                <EvalView result={evalResult} />
               )}
             </div>
           )}

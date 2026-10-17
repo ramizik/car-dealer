@@ -21,13 +21,36 @@ import sim
 DEALS: dict[str, dict] = {}
 EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
-_state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0}
+_state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
+          "phase": "idle", "deal": None}
 
 
 def emit(agent: str, type_: str, text: str, data: dict | None = None) -> None:
     data = data or {}
     EVENTS.append({"id": len(EVENTS) + 1, "ts": time.time(), "deal_id": data.get("deal_id"), "agent": agent,
                    "type": type_, "text": text, "data": data})
+
+
+def _phase(phase: str, deal_id: str | None = None) -> None:
+    _state["phase"], _state["deal"] = phase, deal_id
+
+
+def _on_brain(agent: str, kind: str, payload) -> None:
+    """Brain writes become feed events so the dashboard shows what the team just learned."""
+    if kind != "write" or not isinstance(payload, dict):
+        return
+    v = payload.get("value")
+    val = v if isinstance(v, str) else ", ".join(f"{k}={x}" for k, x in v.items()) if isinstance(v, dict) else str(v)
+    emit(agent or "librarian", "write", f"{payload.get('scope')} / {payload.get('key')}: {val}"[:200],
+         {"scope": payload.get("scope"), "key": payload.get("key"), "kind": payload.get("kind"),
+          "confidence": payload.get("confidence"), "deal_id": _state["deal"]})
+
+
+brain.listeners.append(_on_brain)
+
+
+def status() -> dict:
+    return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal")}
 
 
 def running() -> bool:
@@ -138,12 +161,17 @@ async def _one(i: int, sc: dict) -> None:
     max_buy = sc["seller"]["ask"] * 1.0
     if max_buy > dealer_profile.get()["buy_limit"]:
         return False  # over the dealer's spend limit, not worth a deal row
-    deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "negotiating",
+    deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
             "asking": sc["seller"]["ask"], "max_buy": round(max_buy), "listing_url": listing.get("url"),
             "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []}, "chat": []}
     DEALS[deal_id], _SC[deal_id] = deal, sc
     emit("scout", "state", f"Found {deal['car']} in {deal['location']}, asking ${deal['asking']:,}", {"deal_id": deal_id})
+    _phase("valuing", deal_id)
     await _appraise(deal)
+    deal["state"] = "appraised"
+    await asyncio.sleep(0.3)
+    deal["state"] = "negotiating"
+    _phase("negotiating", deal_id)
     r = await agents.negotiate({"id": deal_id, "ask": deal["asking"], "max_buy": max_buy, "seller_id": sc["seller"]["sid"],
                                 "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto"},
                                sim.make_seller(sc), emit=emit)
@@ -154,6 +182,7 @@ async def _one(i: int, sc: dict) -> None:
     deal["offer"] = int(r["price"])
     deal["_resale"] = (r.get("resale_quote") or {}).get("resale_price")
     deal["state"] = "awaiting_approval"
+    _phase("waiting for owner", deal_id)
     emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK", {"deal_id": deal_id})
     if dealer_profile.get()["decision_mode"] != "dealer_decides":
         await approve(deal_id, True)
@@ -163,6 +192,8 @@ async def _run(max_deals: int) -> None:
     try:
         _state["seed"] += 1
         _state["cap"] = _state["n"] + max_deals
+        _state["started"], _state["ended"] = time.time(), None
+        _phase("scouting")
         try:
             await _scout()
         except Exception as e:
@@ -173,6 +204,7 @@ async def _run(max_deals: int) -> None:
                 break
             if not _state["running"]:
                 break
+            _phase("sourcing")
             try:
                 if await _one(_state["n"] + 1, sc_i) is not False:
                     _state["n"] += 1
@@ -181,6 +213,8 @@ async def _run(max_deals: int) -> None:
             await asyncio.sleep(0.5)
     finally:
         _state["running"] = False
+        _state["ended"] = time.time()
+        _phase("idle")
 
 
 def start(max_deals: int = 5) -> bool:

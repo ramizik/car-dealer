@@ -1,18 +1,15 @@
-// Every read falls back to fixtures, so a dead backend shows sample data, never a blank screen.
-import * as fx from "./fixtures";
+// Reads return null when the backend is unreachable. The UI then says so; it never shows made-up data.
 import type { AgentEvent, Brain, Deal, EvalResult, Health, OnboardingQuestion } from "./types";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-export type Loaded<T> = { data: T; offline: boolean };
-
-async function get<T>(path: string, fallback: T): Promise<Loaded<T>> {
+async function get<T>(path: string): Promise<T | null> {
   try {
     const r = await fetch(`${API}${path}`, { signal: AbortSignal.timeout(3000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return { data: (await r.json()) as T, offline: false };
+    return (await r.json()) as T;
   } catch {
-    return { data: fallback, offline: true };
+    return null;
   }
 }
 
@@ -31,16 +28,15 @@ async function post(path: string, body?: unknown): Promise<boolean> {
 }
 
 export const api = {
-  health: () => get<Health>("/health", fx.health),
-  deals: () => get<Deal[]>("/deals", fx.deals),
-  events: () => get<AgentEvent[]>("/events?since=0", fx.events),
-  brain: () => get<Brain>("/brain", fx.brain),
-  eval: () => get<EvalResult>("/eval", fx.evalResult),
+  health: () => get<Health>("/health"),
+  deals: () => get<Deal[]>("/deals"),
+  events: (since = 0) => get<AgentEvent[]>(`/events?since=${since}`),
+  brain: () => get<Brain>("/brain"),
+  eval: () => get<EvalResult>("/eval"),
   saveSetup: (answers: Record<string, string[]>) => post("/onboarding/answers", { answers }),
-  onboardingQuestions: () => get<OnboardingQuestion[]>("/onboarding/questions", []),
-  startShift: () => post("/shift/start", { max_deals: 5 }),
+  onboardingQuestions: async () => (await get<OnboardingQuestion[]>("/onboarding/questions")) ?? [],
+  startShift: (max_deals: number) => post("/shift/start", { max_deals }),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
   loadSnapshot: (name: "cold" | "warm") => post(`/brain/load/${name}`),
-  runEval: () => post("/eval/run"),
 };

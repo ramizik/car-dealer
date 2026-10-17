@@ -7,7 +7,12 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+import json  # noqa: E402
+import os  # noqa: E402
+from pathlib import Path  # noqa: E402
+
 import brain  # noqa: E402
+import llm  # noqa: E402
 import dealer_memory  # noqa: E402
 import dealer_profile  # noqa: E402
 import loop  # noqa: E402
@@ -30,8 +35,23 @@ class RunReq(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "demo_mode": True, "brain_enabled": True, "sandboxed": False,
-            "shift_running": swarm.running(), "dealer_name": "Joe's Auto"}
+    return {"ok": True, "demo_mode": os.getenv("DEMO_MODE", "0") == "1", "brain_enabled": brain.ENABLED,
+            "llm_live": llm._client is not None, "sandboxed": False,
+            "shift_running": swarm.running(), "shift": swarm.status(), "dealer_name": "Joe's Auto",
+            "llm": llm.stats()}
+
+
+EVAL_FILE = Path(__file__).parent / "data" / "eval_result.json"
+
+
+@app.get("/eval")
+def get_eval():
+    """Last brain OFF vs ON run written by eval.py; empty when it has never run."""
+    if not EVAL_FILE.exists():
+        return {"missing": True}
+    r = json.loads(EVAL_FILE.read_text(encoding="utf-8"))
+    return {k: r.get(k) for k in ("seed", "train_n", "heldout_n", "off", "on", "train", "playbook", "secs")} | {
+        "ran_at": EVAL_FILE.stat().st_mtime}
 
 
 class ShiftReq(BaseModel):

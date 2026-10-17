@@ -285,6 +285,6 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     result = {"deal_id": deal_id, "closed": closed, "price": price, "rounds": sum(t["from"] == "agent" for t in transcript),
               "tactic": tactic, "segment": segment, "channel": channel, "ask": ask, "max_buy": max_buy, "dropped": dropped,
               "transcript": transcript, "recalled": memory, "resale_quote": q, "sell_outreach": sell_pitches}
-    emit("negotiator", "state", f"{'Bought' if closed else 'Dropped'} {deal_id}" + (f" at ${price:,.0f}" if closed else f": {dropped}"),
+    emit("negotiator", "state", f"{'Agreed' if closed else 'Dropped'} {deal_id}" + (f" at ${price:,.0f}" if closed else f": {dropped}"),
          {"deal_id": deal_id, "closed": closed, "price": price})
     return result
