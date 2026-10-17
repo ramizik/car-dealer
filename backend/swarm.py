@@ -8,6 +8,8 @@ import random
 import time
 
 import agents
+import librarian
+import memory_layer
 import brain
 import llm
 import skills
@@ -176,6 +178,9 @@ async def _one(i: int, sc: dict) -> None:
                                 "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto"},
                                sim.make_seller(sc), emit=emit)
     deal["chat"] = _chat(r)
+    # Write-ahead: squeeze the chat into one artifact + status for the shared brain; raw chat stays private.
+    mem = await memory_layer.consolidate("negotiator", f"seller:{sc['seller']['sid']}", deal_id, r)
+    emit("negotiator", "write", f"Saved to memory: [{mem['status']}] {mem['artifact']}", {"deal_id": deal_id, **mem})
     if not r["closed"]:
         deal.update(state="dropped", drop_reason=r.get("dropped") or "no deal")
         return
@@ -186,6 +191,9 @@ async def _one(i: int, sc: dict) -> None:
     emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK", {"deal_id": deal_id})
     if dealer_profile.get()["decision_mode"] != "dealer_decides":
         await approve(deal_id, True)
+
+
+LIBRARIAN_EVERY = 3
 
 
 async def _run(max_deals: int) -> None:
@@ -208,6 +216,8 @@ async def _run(max_deals: int) -> None:
             try:
                 if await _one(_state["n"] + 1, sc_i) is not False:
                     _state["n"] += 1
+                    if _state["n"] % LIBRARIAN_EVERY == 0:
+                        librarian.run(emit)  # distil lessons and tidy memory every few deals
             except Exception as e:  # one bad deal must not stop the shift
                 emit("system", "error", f"Deal skipped: {type(e).__name__}", {})
             await asyncio.sleep(0.5)

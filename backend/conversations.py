@@ -63,3 +63,18 @@ def recent(party: str, n: int = KEEP) -> str:
     text = path.read_text(encoding="utf-8")
     turns = [ln for ln in text.splitlines() if ln.startswith("- **")][-n:]
     return "\n".join(turns)
+
+
+def close(party: str, outcome: str) -> None:
+    """End of a deal: squeeze every turn into the Earlier section and stamp the outcome. Next chat starts clean."""
+    path = _path(party)
+    if not path.exists():
+        return
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    t_idx = lines.index("## Turns\n")
+    earlier = [ln for ln in lines[:t_idx] if ln.startswith("- **")]
+    turns = [ln for ln in lines[t_idx + 1:] if ln.startswith("- **")]
+    squeezed = [ln.rstrip()[:EARLIER_CHARS] + "\n" for ln in turns]
+    stamp = f"- **outcome**: {_mask(outcome)}\n"  # kept like a turn, so later compactions keep it too
+    body = [lines[0], "\n", "## Earlier (short)\n"] + (earlier + squeezed)[-(EARLIER_MAX - 1):] + [stamp, "\n", "## Turns\n"]
+    path.write_text("".join(body), encoding="utf-8")

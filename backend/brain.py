@@ -62,7 +62,8 @@ def events() -> list[dict]:
         return list(_events)
 
 
-def write(agent, scope, key, kind, value, source="", confidence=0.5, attr=None, ts=None) -> dict | None:
+def write(agent, scope, key, kind, value, source="", confidence=0.5, attr=None, ts=None, visible_to=None) -> dict | None:
+    """visible_to: agent names allowed to recall this write. None means every agent (shared)."""
     if scope not in SCOPES:
         raise ValueError(f"bad scope {scope!r}, want one of {SCOPES}")
     if kind not in KINDS:
@@ -74,6 +75,8 @@ def write(agent, scope, key, kind, value, source="", confidence=0.5, attr=None, 
         "agent": agent, "scope": scope, "key": str(key), "kind": kind,
         "attr": attr, "value": value, "source": source, "confidence": float(confidence),
     }
+    if visible_to:
+        ev["visible_to"] = sorted(visible_to)
     with _lock:
         _load_log()
         DIR.mkdir(parents=True, exist_ok=True)
@@ -171,6 +174,10 @@ def _lines(scope, key, entry):
         yield n["confidence"], f"{scope} {key}: {n['text']}"
 
 
+def _visible(ev: dict, agent: str) -> bool:
+    return not ev.get("visible_to") or agent in ev["visible_to"]
+
+
 def recall(scopes, keys=(), tags=None, budget_chars=1500, agent="") -> list[str]:
     """Ranked one-line memories: exact key match, then partial match, then confidence, then recency."""
     if not ENABLED:
@@ -178,7 +185,7 @@ def recall(scopes, keys=(), tags=None, budget_chars=1500, agent="") -> list[str]
     scopes = [scopes] if isinstance(scopes, str) else list(scopes)
     keys = [keys] if isinstance(keys, str) else list(keys or [])
     tags = [t.lower() for t in (tags or [])]
-    v = view()["scopes"]
+    v = view([e for e in events() if _visible(e, agent)])["scopes"]  # private writes stay with their agents
     ranked = []
     for s in scopes:
         for k, entry in v.get(s, {}).items():
