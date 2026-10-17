@@ -19,18 +19,6 @@ type Props = {
   onInsights: () => void;
 };
 
-// The steps every deal walks through. Each one is a real backend state, nothing is staged for the screen.
-const STEPS: { label: string; states: DealState[] }[] = [
-  { label: "Found", states: ["sourced"] },
-  { label: "Valued", states: ["appraised"] },
-  { label: "Negotiating", states: ["negotiating"] },
-  { label: "Your OK", states: ["awaiting_approval"] },
-  { label: "Bought", states: ["bought", "in_transit", "delivered"] },
-  { label: "Listed", states: ["listed"] },
-  { label: "Sold", states: ["sold"] },
-];
-const stepOf = (s: DealState) => STEPS.findIndex((x) => x.states.includes(s));
-
 // What the demo does once started. Shown before the button so nobody is surprised.
 const PLAN: { title: string; text: string }[] = [
   { title: "Finds cars all day", text: "The scout scans the market for cars that fit your setup and keeps looking as the shift goes on." },
@@ -145,9 +133,9 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
             <div style={{ width: `${Math.round((shift?.progress ?? 0) * 100)}%` }} className={running ? "live" : ""} />
           </div>
           {running ? (
-            <button onClick={onStop}>Stop demo</button>
+            <button onClick={onStop}>End shift</button>
           ) : (
-            <button className="primary big" onClick={onStart} disabled={!health || wrapping}>{started ? "Start again" : "Start Demo"}</button>
+            <button className="primary big" onClick={onStart} disabled={!health || wrapping}>Start shift</button>
           )}
         </div>
       </section>
@@ -193,22 +181,10 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
       <section className="panel" aria-labelledby="pipeline">
         <div className="panel-head">
           <h2 id="pipeline">Deal board</h2>
-          <span className="muted small">{deals.length} deals · {deals.filter((d) => d.state === "dropped").length} stopped · <a href={api.storefrontUrl} target="_blank" rel="noreferrer">Storefront</a></span>
+          <a className="storefront-btn" href={api.storefrontUrl} target="_blank" rel="noreferrer">Open storefront ↗</a>
         </div>
-        <ol className="stepper">
-          {STEPS.map((s, i) => {
-            const n = deals.filter((d) => s.states.includes(d.state)).length;
-            const active = running && inProgress.some((d) => stepOf(d.state) === i);
-            return (
-              <li key={s.label} className={`${n ? "has" : ""} ${active ? "active" : ""}`}>
-                <span className="step-n mono">{n}</span>
-                <span className="step-l">{s.label}</span>
-              </li>
-            );
-          })}
-        </ol>
         {deals.length === 0 ? (
-          <p className="empty">No deals yet. Press Start Demo and each car appears here as it moves through the steps.</p>
+          <p className="empty">No deals yet. Start a shift and each car appears here as it moves through the steps.</p>
         ) : (
           <div className="lanes">
             {[...COLUMNS, { title: "Stopped", hint: "Walked away, scams, over budget", states: ["dropped" as DealState] }].map((col) => {
@@ -225,10 +201,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
                       return (
                         <li key={d.id}>
                           <button className={`card ${asks ? "asks" : ""} ${running && working(d) ? "busy" : ""}`} onClick={() => onOpen(d.id)}>
-                            <span className="card-top">
-                              <strong>{d.car.split(" · ")[0]}</strong>
-                              <span className="muted small mono">{d.id}</span>
-                            </span>
+                            <strong className="card-top">{d.car.split(" · ")[0]}</strong>
                             <span className="small card-step">{asks ? "Needs you" : d.state === "dropped" ? `Stopped: ${d.drop_reason}` : stageLabel(d.state)}</span>
                             <span className="small muted">{d.state === "dropped" ? "" : keyNumber(d)}</span>
                             {said && d.state !== "dropped" && <span className="small muted card-said">{said.text}</span>}
