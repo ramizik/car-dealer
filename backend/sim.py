@@ -258,11 +258,20 @@ def _scenario(i: int, seed: int, rng: random.Random, listings: list[dict], whole
     }
 
 
-def scenarios(seed: int = 1, n: int = 30) -> dict:
+def scenarios(seed: int = 1, n: int = 30, shuffle: bool = False) -> dict:
     """{train: [...], heldout: [...]}. First 2/3 train, rest held-out. Stable for a seed (1.D10).
-    Only wholesaler_repeat sellers may appear in both splits."""
+    Only wholesaler_repeat sellers may appear in both splits. shuffle=True mixes the car list per seed
+    (live shift); eval keeps the fixed order so its scores stay comparable."""
     rng = random.Random(f"scenarios-{seed}")
     listings, wholesalers = _listings(), []
+    if shuffle:
+        random.Random(f"listings-{seed}").shuffle(listings)
+        by_make = {}
+        for x in listings:
+            by_make.setdefault(x.get("make"), []).append(x)
+        queues, listings = list(by_make.values()), []
+        while any(queues):
+            listings += [q.pop(0) for q in queues if q]
     all_sc = [_scenario(i, seed, rng, listings, wholesalers) for i in range(n)]
     cut = round(n * 2 / 3)
     return {"train": all_sc[:cut], "heldout": all_sc[cut:]}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { api } from "./api";
-import { COLUMNS, CRAIGSLIST_POST, STAGES, craigslistDraft, money, profit, time } from "./format";
+import { COLUMNS, CRAIGSLIST_POST, STAGES, craigslistDraft, eventTime, money, profit, shopLabelMap, type ShopAnchor } from "./format";
 import type { AgentEvent, Deal } from "./types";
 import { CHANNEL_LABELS } from "./channels";
 import SellerTurn from "./SellerTurn";
@@ -10,16 +10,18 @@ import { decisionLine, nowFor } from "./status";
 type Props = {
   deal: Deal;
   events: AgentEvent[];
+  shift?: ShopAnchor | null;
   onClose: () => void;
   onDecide: (id: string, yes: boolean) => void;
   onSale: (id: string, yes: boolean) => void;
 };
 
 
-export default function DealPanel({ deal, events, onClose, onDecide, onSale }: Props) {
+export default function DealPanel({ deal, events, shift, onClose, onDecide, onSale }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const step = STAGES.findIndex((s) => s.state === deal.state);
   const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
+  const times = shopLabelMap(events.filter((e) => e.deal_id === deal.id), shift);
   const stopped = deal.state === "dropped";
   const memory = events.filter((e) => e.deal_id === deal.id && e.type === "write" && typeof e.data.artifact === "string");
   const lastAudio = deal.chat.map((t) => Boolean(t.audio_url)).lastIndexOf(true);
@@ -135,6 +137,17 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
           );
         })()}
 
+        {deal.photos && deal.photos.length > 0 && (
+          <div className="photo-strip" aria-label="Listing photos">
+            {deal.photos.map((src) => (
+              <a key={src} href={deal.listing_url || src} target="_blank" rel="noopener noreferrer">
+                <img src={src} alt={deal.car} loading="lazy" referrerPolicy="no-referrer"
+                  onError={(e) => { e.currentTarget.parentElement!.style.display = "none"; }} />
+              </a>
+            ))}
+          </div>
+        )}
+
         {deal.listing_url && (
           <p className="small">
             <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">
@@ -212,14 +225,14 @@ export default function DealPanel({ deal, events, onClose, onDecide, onSale }: P
         )}
 
         <section aria-labelledby="history">
-          <h3 id="history">History</h3>
+          <h3 id="history">History{shift?.started != null && <span className="muted small"> · shop time</span>}</h3>
           {history.length === 0 && <p className="empty">Nothing recorded for this car yet.</p>}
           <ol className="timeline">
             {history.map((e) => (
               <li key={e.id} className={`tl tl-${kind(e)}`}>
                 <span className="tl-dot" aria-hidden />
                 <span className="who">
-                  {time(e.ts)}
+                  {eventTime(e, times)}
                   {typeof e.data.channel === "string" && <span className="tag channel">{CHANNEL_LABELS[e.data.channel] ?? e.data.channel}</span>}
                 </span>
                 {e.text}

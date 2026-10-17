@@ -405,6 +405,7 @@ async def _one(sc: dict, live_call: bool = False) -> bool:
         _state["live_busy"] = True  # no second caller until this one has really phoned in
     deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
             "asking": sc["seller"]["ask"], "max_buy": round(max_buy), "listing_url": listing.get("url"),
+            "photos": listing.get("photo_urls") or [],
             # Profit if we pay exactly the max: expected resale (same SELL_FACTOR and RECON as the sales desk) minus max and recon.
             "max_profit": round(round(comps * seller_agent.SELL_FACTOR, -1) - max_buy - seller_agent.RECON),
             "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []},
@@ -465,11 +466,11 @@ SCOUT_EVERY = 6  # fresh market scan after this many cars started
 def _supply(first: bool) -> list[dict]:
     """A fresh batch of cars (scenarios) for the cars still to be found."""
     _state["seed"] += 1
-    sc = sim.scenarios(_state["seed"], 16)
+    sc = sim.scenarios(_state["seed"], 16, shuffle=True)
     batch = sc["train"] + sc["heldout"]
     if os.getenv("DEMO_MODE", "0") == "1" and first:
         # demo: an affordable scam attempt shows up as the second car, not by luck
-        pool = sim.scenarios(_state["seed"], 60)
+        pool = sim.scenarios(_state["seed"], 60, shuffle=True)
         scam = next((x for x in pool["train"] + pool["heldout"] if x["seller"]["persona"] == "scammer"
                      and x["seller"]["ask"] <= dealer_profile.get()["buy_limit"]), None)
         if scam:
@@ -477,7 +478,8 @@ def _supply(first: bool) -> list[dict]:
             batch.insert(1, scam)
     real = craigslist.load()
     if real:  # real Craigslist listings replace the simulated ones; seller behaviour stays simulated
-        batch = [craigslist.as_scenario(x, real[i % len(real)]) for i, x in enumerate(batch)]
+        start = (_state["seed"] - 1) * len(batch)
+        batch = [craigslist.as_scenario(x, real[(start + i) % len(real)]) for i, x in enumerate(batch)]
     return batch
 
 
@@ -506,14 +508,15 @@ LOT_CARS = 3  # cars already on the lot when the shift opens, so buyer offers st
 def _seed_lot() -> None:
     """Morning stock: cars already bought and listed. Buyers send offers on them from the first seconds, so the
     sell side runs next to the buy side. Each goes through the same _sell path as a car the team bought."""
-    batch = sim.scenarios(_state["seed"] + 500, 12)
+    batch = sim.scenarios(_state["seed"] + 500, 12, shuffle=True)
     for sc in (batch["train"] + batch["heldout"])[:LOT_CARS]:
         ask = sc["seller"]["ask"]
         _state["n"] += 1
         deal_id = f"D-{200 + _state['n']}"
         paid = round(ask * random.Random(deal_id).uniform(0.6, 0.88), -2)
         deal = {"id": deal_id, "car": _title(sc["listing"]), "location": sc["listing"].get("city", ""), "state": "listed",
-                "asking": ask, "max_buy": round(paid), "listing_url": sc["listing"].get("url"), "chat": [], "turn": None,
+                "asking": ask, "max_buy": round(paid), "listing_url": sc["listing"].get("url"),
+                "photos": sc["listing"].get("photo_urls") or [], "chat": [], "turn": None,
                 "valuation": {"low": round(ask * 0.95), "mid": ask, "high": round(ask * 1.1), "citations": []},
                 "bought_for": int(paid), "shipping": 0, "list_price": int(round(ask * 1.12, -1)), "on_lot": True}
         deal["listing"] = ops._template_listing(deal)

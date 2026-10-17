@@ -468,6 +468,8 @@ table.mini th, table.mini td { padding: 8px 12px; }
 .lean .bar { max-width: 260px; }
 .listing-copy { padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); font-size: 14px; }
 .listing-copy ul { margin: 6px 0 0; padding-left: 18px; }
+.photo-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin: 4px 0 8px; }
+.photo-strip img { height: 120px; width: 160px; object-fit: cover; border-radius: var(--radius-sm); display: block; }
 
 /* Whose turn it is (live seller). Colour is never the only cue: each state also has a text pill and a step track. */
 .turn { margin: 12px 0; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); }

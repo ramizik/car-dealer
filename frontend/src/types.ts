@@ -64,6 +64,7 @@ export type Deal = {
   turn?: Turn;
   drop_reason?: string;
   listing_url?: string;
+  photos?: string[];
   shipping?: number;
   ship_days?: number;
   listing?: { title: string; description: string; bullets: string[] };
@@ -84,6 +85,7 @@ export type ShiftStatus = {
   scouting?: boolean;
   progress?: number; // 0 to 1 of the shop day
   sim_minutes?: number; // shop minutes since 8:00 AM
+  shift_secs?: number; // real seconds that stand for the 8-hour shop day
 };
 
 export type LlmTier = { model: string; calls?: number; errors?: number; avg_latency: number | null };
@@ -154,5 +156,5 @@ export type OnboardingQuestion = {
 };
 
 // Cars to sell from a public listing source (Craigslist), shown on the Selling page.
-export type InventoryItem = { title: string; price: number | null; location: string; url: string };
+export type InventoryItem = { title: string; price: number | null; location: string; url: string; photo_urls?: string[] };
 export type Inventory = { source: string; count: number; listings: InventoryItem[] };
