@@ -11,6 +11,7 @@ import re
 import brain
 import conversations
 import llm
+import seller_agent
 import skills
 import voice
 
@@ -107,6 +108,20 @@ async def _message(deal, tactic, offer, round_, seller_text, memory, party="", s
     return text if text and amounts == {int(offer)} else _template(tactic, offer, round_, comps)
 
 
+def _ask_seller_agent(deal: dict, buy_price: float, emit, deal_id: str) -> dict:
+    """Buyer -> seller agent: 'if we pay X, what can we sell it for, how fast, and what do we make?'"""
+    emit("negotiator", "message", f"Asked sales desk: if we pay ${buy_price:,.0f}, what can we sell it for?",
+         {"deal_id": deal_id, "kind": "ask_seller_agent", "buy_price": buy_price})
+    q = seller_agent.quote(deal, buy_price)
+    if q["resale_price"]:
+        text = (f"Sell for about ${q['resale_price']:,.0f} in ~{q['days_to_sell']:.0f} days ({q['days_source']}); "
+                f"profit ~{seller_agent.usd(q['profit'])}. {'Go ahead.' if q['verdict'] == 'buy' else 'Pass: ' + '; '.join(q['reasons'])}")
+    else:
+        text = "Can't price a resale yet (no market value). Go ahead, but check comps."
+    emit("seller_agent", "message", text, {"deal_id": deal_id, "kind": "resale_quote", **q})
+    return q
+
+
 async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, rng=None) -> dict:
     """Buy-side negotiation, <= MAX_ROUNDS. `seller.respond(offer, tactic) -> (accepted, counter, text)`.
 
@@ -142,6 +157,21 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     last = (known.get("facts", {}).get("last_counter_pct") or {}).get("value")
     if isinstance(last, (int, float)):
         cap = min(cap, ask * float(last))
+
+    # Coordinate with the seller agent before spending: resale price, days to sell, profit at our max.
+    q = _ask_seller_agent(deal, max_buy, emit, deal_id)
+    profit_cap = (q["resale_price"] - seller_agent.RECON - seller_agent.MIN_PROFIT) if q["resale_price"] else None
+    too_slow = bool(q["days_to_sell"] and q["days_to_sell"] > seller_agent.MAX_DAYS)
+    no_margin = profit_cap is not None and profit_cap < ask * OPEN_PCT * 0.8  # can't profit at any realistic offer
+    if too_slow or no_margin:
+        dropped = f"sales desk: {q['reasons'][0]}"
+        emit("negotiator", "state", f"Dropped {deal_id}: {dropped}", {"deal_id": deal_id, "closed": False, "price": None})
+        return {"deal_id": deal_id, "closed": False, "price": None, "rounds": 0, "tactic": tactic, "segment": segment,
+                "ask": ask, "max_buy": max_buy, "dropped": dropped, "transcript": [], "recalled": memory, "resale_quote": q}
+    if profit_cap is not None:
+        # Never pay more than leaves the minimum profit after resale and recon.
+        max_buy = min(max_buy, profit_cap)
+        cap = min(cap, max_buy)
 
     offer = round(min(cap, ask * OPEN_PCT), -1)
     transcript, counter, closed, price, dropped = [], None, False, None, ""
@@ -214,9 +244,17 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
                 f"{segment}: {tactic} {'closed at $%s' % f'{price:,.0f}' if closed else 'failed (' + dropped + ')'}; said: {hint}",
                 confidence=0.7, source=f"chat:{deal_id}")
 
+    if closed:
+        # Confirm with the seller agent at the real price, and keep the answer in team memory.
+        q = _ask_seller_agent(deal, price, emit, deal_id)
+        if q["resale_price"]:
+            brain.write("seller_agent", "market", f"resale|{seller_agent.model_key(deal)}", "note",
+                        f"bought ${price:,.0f}; resale ~${q['resale_price']:,.0f}, ~{q['days_to_sell']:.0f} days "
+                        f"({q['days_source']}), profit ~{seller_agent.usd(q['profit'])}", confidence=0.6, source=f"quote:{deal_id}")
+
     result = {"deal_id": deal_id, "closed": closed, "price": price, "rounds": sum(t["from"] == "agent" for t in transcript),
               "tactic": tactic, "segment": segment, "ask": ask, "max_buy": max_buy, "dropped": dropped,
-              "transcript": transcript, "recalled": memory}
+              "transcript": transcript, "recalled": memory, "resale_quote": q}
     emit("negotiator", "state", f"{'Bought' if closed else 'Dropped'} {deal_id}" + (f" at ${price:,.0f}" if closed else f": {dropped}"),
          {"deal_id": deal_id, "closed": closed, "price": price})
     return result

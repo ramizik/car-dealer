@@ -14,6 +14,7 @@ const AGENT_NAMES: Record<string, string> = {
   appraiser: "Valuer",
   negotiator: "Negotiator",
   seller: "Seller",
+  seller_agent: "Sales desk",
   logistics: "Shipping",
   librarian: "Memory",
 };
