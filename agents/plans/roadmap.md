@@ -1,21 +1,24 @@
 # Dealer: 6-hour build roadmap (Shared Brain track)
 
-**Status (2026-10-17, updated after the NVIDIA setup):** P0 to P3 are done in code, and P4 (the eval number) is measured. Crusoe, You.com, NemoClaw on the droplet, and the brain OFF vs ON eval all run. The live seller flow and NVIDIA speech are built and their pieces pass, but the full live shift in the browser is not yet verified. P5 (hardening, rehearsals, backup video) has not started. Details in "Current state" below.
+**Status (2026-10-17, after the demo redesign):** P0 to P3 are done in code, and P4 (the eval number) is measured. The dashboard now has a single **Start Demo** button that runs a simulated 8-hour shop day in ~5 minutes with up to 4 deals at once, buying and selling together. Crusoe, You.com, NemoClaw on the droplet, and the brain OFF vs ON eval all run. The live seller call and NVIDIA speech are built and their pieces pass, but the full live call in the browser is not yet verified. P5 (hardening, rehearsals, backup video) has not started. Details in "Current state" below.
 
 ## Current state (2026-10-17)
 
 **Works (verified in this repo or on the droplet):**
 - Brain, LLM tiers with throttle and backoff, You.com wrapper with disk cache, simulator (`sim.py`). Offline tests: `test_brain.py` and `test_memory_tiers.py` pass.
 - Eval: `EVAL_SEED=1` and `EVAL_SEED=2`, `SIM_FAST=1 python eval.py`, about 20 s, brain OFF vs ON on 10 held-out sellers. Seed 1 is stored in `backend/data/eval_result.json`.
-- Full autonomous shift in `swarm.py` with `ops.py`: scout, appraise, negotiate, approval, logistics, storefront, sell, librarian. Restart resumes from `data/state.json`.
+- Demo workday in `swarm.py` (`_workday`) with `ops.py`: scout, appraise, negotiate, approval, logistics, storefront, sell, librarian. Length `DEMO_SHIFT_SECS` (300), parallel cars `DEMO_PARALLEL` (4), arrivals every 2-5 s. Restart resumes from `data/state.json`.
+- Auto vs ask: buys and sales with profit at least 2x the dealer's minimum go through alone; the rest wait under Needs you. 3 cars are on the lot at shift start so buyer offers come in at once.
+- Shift page: one Start Demo button with a 6-step summary, shop clock, Needs you rows with inline Buy / Sell buttons, deal board lanes (Buying, Coming in, For sale, Sold, Stopped).
 - Real Craigslist listings in the scout (`craigslist.py`, `gen_inventory.py`), with synthetic inventory as the demo pool.
 - NemoClaw concierge in the sandbox on the droplet: start shift, briefing, scam domain blocked.
 - NVIDIA speech and embeddings pass `python backend/nvidia_check.py`: key, Parakeet ASR (`parakeet-tdt-0_6b-v2`), Magpie TTS (`Magpie-Multilingual.EN-US.Aria`), a TTS to ASR round trip, and embeddings (`nvidia/nemotron-3-embed-1b`).
-- Live seller (`live.py`): the first deal of a live shift waits for the seller's answer from the browser. Endpoints `POST /deals/{id}/seller-audio`, `POST /deals/{id}/seller-text`, `GET /clips/{id}.wav`. Times out to the simulated seller after 120 s.
+- Live seller call (`live.py`): about 5 s into the demo one car's seller waits for an answer from the browser (a car dropped before the call hands it to the next). Endpoints `POST /deals/{id}/seller-audio`, `POST /deals/{id}/seller-text`, `GET /clips/{id}.wav`. After 60 s unanswered the simulated seller carries the rest of the call.
 - Twilio phone line removed (`fa79d08`).
 
 **Not tested yet:**
-- The live shift in the browser: recording with the mic, the turn banner, agent audio playback, and the typed fallback. The UI could not be started in this session, so this is the top risk.
+- The live call in the browser: recording with the mic, the turn banner, agent audio playback, and the typed fallback. The new Shift page was typechecked and run against the mock backend only, never viewed in a browser. This is the top risk.
+- Parallel deals with the real model: Crusoe RPM (30 without a payment method) may throttle 4 deals at once; watch for slow rounds.
 - The live path with real speech: browser WAV to Parakeet, and agent lines to Magpie inside a real negotiation. Only the standalone round trip has run.
 - Mic access on a non-localhost origin. The browser requires HTTPS there, and nothing is set up for it.
 - The droplet frontend: the dashboard is not served from the droplet yet, so the demo runs from a laptop on localhost against the droplet API (or the backend locally).
@@ -24,7 +27,7 @@
 - `DEMO_MODE=1` end to end on a fresh clone.
 
 **Next steps, in order:**
-1. Run `python backend/nvidia_check.py` on the machine that will do the demo, then run one live shift on localhost with "I answer as the first seller" ticked. Record the seller answer with the mic and by typing. Fix whatever breaks.
+1. Run `python backend/nvidia_check.py` on the machine that will do the demo, then press Start Demo on localhost and answer the Live call with the mic and by typing. Check the Needs you rows and the board. Fix whatever breaks. Set `DEMO_PACE_MIN/MAX` (about 2 and 5) so parallel deals are readable.
 2. Check the droplet path: either serve the frontend and tunnel the API, or run the backend locally against the droplet concierge.
 3. Degraded mode (5.2) and a `DEMO_MODE=1` dry run (5.1, 5.3).
 4. Two rehearsals and a backup video (5.5). Pre-flight checklist (5.6).

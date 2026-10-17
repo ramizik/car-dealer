@@ -4,7 +4,7 @@ A team of Nemotron agents finds real used-car listings, appraises them with cite
 
 **Track:** Shared Brain. **Sponsors used:** Crusoe Managed Inference, NVIDIA Nemotron, NVIDIA NemoClaw / OpenShell, You.com APIs, NVIDIA Speech (Parakeet, Magpie) and embeddings.
 
-**Status (2026-10-17):** the full pipeline runs in code, and the brain OFF vs ON eval is measured. The live seller flow (a person answers the seller's turn in the browser) and the NVIDIA speech path are built and their pieces pass, but the full live shift in the browser is not yet tested. The detailed state and next steps are in [`agents/plans/roadmap.md`](agents/plans/roadmap.md) under "Current state".
+**Status (2026-10-17):** the full pipeline runs in code, and the brain OFF vs ON eval is measured. The dashboard has one **Start Demo** button: a simulated 8-hour shop day in about 5 minutes with up to 4 deals at once, buying and selling together. The live seller call (a person answers in the browser) and the NVIDIA speech path are built and their pieces pass, but the full live call in the browser is not yet tested. The detailed state and next steps are in [`agents/plans/roadmap.md`](agents/plans/roadmap.md) under "Current state".
 
 ## Result: brain OFF vs ON
 
@@ -26,9 +26,9 @@ Each simulated seller type has a hidden weak tactic. The mapping exists only in 
 - **Source:** You.com Search finds real listings near the dealer, and Craigslist listings are pulled as well. Nemotron Nano parses year, miles, price and VIN from page text.
 - **Appraise:** You.com Research (`lite`) returns a fair-value range with citations. These become `market` facts in the brain, with source URLs. A VIN check looks for web-reported flags.
 - **Negotiate:** the buyer agent identifies the seller type, recalls that seller and the playbook, picks a tactic, and haggles within the dealer's max. Offers are clamped in code, not by the model. Off-platform payment links are blocked and the seller is red-flagged.
-- **Owner approval:** every buy waits in the dashboard for **Approve / Reject**. Rejection reasons become dealer preferences that later scouting respects.
-- **List and sell:** the seller agent writes the listing, then negotiates with simulated buyers above the dealer's floor and minimum profit.
-- **Live seller (optional):** tick "I answer as the first seller" on the Shift tab. The first deal's seller is a person: the agent's lines are spoken (Magpie), and the seller's answer is recorded in the browser (Parakeet) or typed. The turn banner shows whose turn it is. No answer within 120 s and the simulated seller answers that round. No real person is contacted.
+- **Owner approval:** clear wins (profit at least 2x the dealer's minimum) are bought and sold automatically. Borderline buys and sales appear under **Needs you** with their own Buy / Sell buttons. Declines become dealer preferences that later scouting respects.
+- **List and sell:** the seller agent writes the listing, then negotiates with simulated buyers above the dealer's floor and minimum profit. Three cars are already on the lot when the shift opens, so buyer offers arrive in the first seconds while buying continues.
+- **Live seller call:** about 5 seconds into the demo one seller phones in (a **Live call** row under Needs you). The agent's lines are spoken (Magpie), and the seller's answer is recorded in the browser (Parakeet) or typed. No answer within 60 s and the simulated seller carries the rest of the call. No real person is contacted.
 - **Concierge:** an OpenClaw agent in a NemoClaw sandbox drives the dealer API ("start a shift for Tacomas", "what happened overnight?").
 
 ## Pipeline
@@ -36,13 +36,15 @@ Each simulated seller type has a hidden weak tactic. The mapping exists only in 
 ```
 Dealer setup (dashboard) -> brain: dealer facts (budget, per-car limit, min profit, preferences)
         |
-POST /demo/start (alias /shift/start) -> swarm.py: a simulated 8-hour shop day, up to 4 deals in parallel, ~5 min; clear wins auto-approve, borderline ones wait for the dealer; after-buy steps run in the background
+POST /demo/start (alias /shift/start, any body ignored) -> swarm.py: a simulated 8-hour shop day in DEMO_SHIFT_SECS (300 s), up to DEMO_PARALLEL (4) deals at once,
+            cars arrive every 2-5 s, 3 cars already on the lot get buyer offers from the start; clear wins auto-approve,
+            borderline ones wait for the dealer; after-buy steps run in the background
         |
 scout       You.com Search, Craigslist -> Contents -> Nano extract -> listings
 appraise    You.com Research -> Nano extract {low, mid, high, issues, sources} -> brain.market
 negotiate   recall(party, dealer, playbook) -> segment -> tactic -> seller (sim, or live person)
             -> brain.write(playbook counter, party facts, red flags) + MISTAKES.md on a miss
-approve     state=awaiting_approval -> dashboard Approve / Reject -> POST /deals/{id}/approve
+approve     clear win -> auto; else state=awaiting_approval -> Needs you: Buy / Decline -> POST /deals/{id}/approve (sales: POST /deals/{id}/sale)
 logistics, storefront, sell   transport quote -> listing copy -> sim buyer -> sold, margin -> brain.write
 librarian   every 3 deals: compacts the brain, distils lessons
         |
@@ -77,7 +79,8 @@ cd frontend && npm install && npm run dev                  # dashboard
 - **NVIDIA key:** build.nvidia.com, sign in, profile > API Keys > Generate. Put it in `backend/.env` as `NVIDIA_API_KEY=nvapi-...`. Never commit it.
 - **No keys:** mock mode, the full UI still works.
 - **`DEMO_MODE=1`:** You.com answers come from `backend/data/cache` (real listings, pre-warmed), so no network is needed.
-- **Live seller:** Shift tab, tick "I answer as the first seller", then start the shift. The mic needs `localhost` or HTTPS.
+- **Live seller call:** press Start Demo and watch for the Live call row. The mic needs `localhost` or HTTPS.
+- **Demo tuning (env):** `DEMO_SHIFT_SECS` (300), `DEMO_PARALLEL` (4), `DEMO_PACE_MIN/MAX` (seconds between negotiation messages; try 2 and 5 so parallel deals visibly overlap).
 - **Eval:** `cd backend && SIM_FAST=1 python eval.py`. Set `EVAL_SEED=2` for the second split. Stop any running shift first.
 - **Reset the demo:** `cd backend && python reset_demo.py [cold|warm]`.
 - **NemoClaw sandbox:** follow `nemoclaw/SETUP.md`.
@@ -87,7 +90,8 @@ cd frontend && npm install && npm run dev                  # dashboard
 Tested: brain order-independence and memory tiers (`test_brain.py`, `test_memory_tiers.py`), the eval, and the NVIDIA speech round trip (`nvidia_check.py`).
 
 Not yet tested:
-- The live shift in the browser: mic recording, the turn banner, agent audio playback, and the typed fallback.
+- The live call in the browser: mic recording, the turn banner, agent audio playback, and the typed fallback.
+- The redesigned Shift page (Needs you, deal board) in a browser with the real model: only typechecked and run against the mock backend.
 - Real speech inside a live negotiation (only the standalone round trip has run).
 - Mic access on a non-localhost origin (needs HTTPS).
 - The dashboard served from the droplet (the demo currently runs from a laptop against the droplet API or a local backend).
@@ -97,7 +101,7 @@ Not yet tested:
 
 - No real person is contacted. Real listings are read-only, and every seller and buyer is simulated. The live seller is the only human, and that is someone at the dealer's own desk playing the seller in a demo.
 - Every outbound message carries an AI-assistant disclosure.
-- No buy happens without the owner's Approve.
+- No borderline buy or sale happens without the owner's yes; only clear wins (profit at least 2x the minimum) go through alone.
 - Offers above `max_buy` and sales below the floor are blocked in code.
 - Keys stay in `backend/.env` (never committed) or the OpenShell gateway, outside the sandbox.
 
@@ -109,7 +113,7 @@ backend/   FastAPI: main.py (routes), swarm.py (shift), ops.py (logistics, store
            sim.py, eval.py, youcom.py, craigslist.py, llm.py, voice.py, skills.py,
            nvidia_check.py, crusoe_check.py, reset_demo.py
 backend/skills/  SKILL.md + MISTAKES.md per agent
-frontend/  Vite + React + TypeScript dashboard (Shift, Buying, Inventory, Selling, Insights, Setup)
+frontend/  Vite + React + TypeScript dashboard (Shift with Start Demo, Needs you and deal board; Buying, Inventory, Selling, Insights, Setup)
 nemoclaw/  sandbox runbook, egress presets, concierge skill
 docs/project-idea.md   full pitch; agents/plans/roadmap.md   build plan and current state
 ```

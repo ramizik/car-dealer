@@ -22,10 +22,10 @@ Start a shift (optional search focus):
 
 ```bash
 curl -s -X POST http://10.120.0.2:8000/shift/start \
-  -H 'Content-Type: application/json' -d '{"query": "Toyota Tacoma near Stockton", "max_deals": 5}'
+  -H 'Content-Type: application/json' -d '{}'
 ```
 
-Run all night ("keep working", "run until I stop you"): `"max_deals": 0` keeps scouting, buying, shipping, listing and selling until stopped.
+This starts the demo shift: a simulated 8-hour shop day (about 5 minutes) with several cars at once, buying and selling together. Any body is ignored; there are no options. Stop it early with the stop command below.
 
 Public listings page the team publishes: `curl -s http://10.120.0.2:8000/storefront`
 
