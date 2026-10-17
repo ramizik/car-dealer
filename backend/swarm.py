@@ -85,29 +85,38 @@ def emit(agent: str, type_: str, text: str, data: dict | None = None) -> None:
                    "type": type_, "text": text, "data": data})
 
 
-# Demo names for the admin page. Each agent is shown as working when its job is running now.
+# Demo names for the admin page. "emits" are the names the agents use in the event feed and memory.
 ROSTER = [
-    {"name": "Sam", "role": "Scout", "phase": "scouting"},
-    {"name": "Priya", "role": "Appraiser", "phase": "valuing"},
-    {"name": "Marcus", "role": "Buyer agent", "phase": "sourcing"},
-    {"name": "Ivy", "role": "Librarian", "phase": "tidying memory"},
-    {"name": "Ruth", "role": "Logistics", "states": ["in_transit"]},
-    {"name": "Omar", "role": "Merchandiser", "states": ["delivered"]},
-    {"name": "Leo", "role": "Seller agent", "states": ["listed", "awaiting_sale"]},
+    {"name": "Sam", "role": "Scout", "emits": ["scout"], "phase": "scouting"},
+    {"name": "Priya", "role": "Appraiser", "emits": ["appraiser"], "phase": "valuing"},
+    {"name": "Marcus", "role": "Buyer agent", "emits": ["negotiator", "buyer"], "phase": "sourcing"},
+    {"name": "Ivy", "role": "Librarian", "emits": ["librarian"], "phase": "tidying memory"},
+    {"name": "Ruth", "role": "Logistics", "emits": ["logistics"]},
+    {"name": "Omar", "role": "Merchandiser", "emits": ["merchandiser"]},
+    {"name": "Leo", "role": "Seller agent", "emits": ["seller", "seller_agent"]},
 ]
+RECENT_S = 120  # an agent counts as working if it logged something this recently
 
 
 def roster() -> dict:
-    """Who is working right now, from the shift phase and what the deals are doing."""
-    phase = _state["phase"]
+    """Who is working now: logged in the last two minutes, or doing a job in the active shift, plus memory writes."""
+    now = time.time()
     phases = set(_active.values())
-    states = {d.get("state") for d in DEALS.values()}
+    last: dict[str, float] = {}
+    for e in EVENTS:
+        last[e["agent"]] = max(last.get(e["agent"], 0.0), e["ts"])
+    writes: dict[str, int] = {}
+    for e in brain.events():
+        writes[e.get("agent", "")] = writes.get(e.get("agent", ""), 0) + 1
     rows, working = [], 0
     for a in ROSTER:
-        busy = (a.get("phase") in phases) or any(st in states for st in a.get("states", []))
+        seen = max((last.get(n, 0.0) for n in a["emits"]), default=0.0)
+        busy = (now - seen < RECENT_S) or (a.get("phase") in phases)
         working += busy
-        rows.append({"name": a["name"], "role": a["role"], "status": "working" if busy else "idle"})
-    return {"working": working, "total": len(ROSTER), "shift_phase": phase, "agents": rows, "demo_names": True}
+        rows.append({"name": a["name"], "role": a["role"], "status": "working" if busy else "idle",
+                     "last_seen_s": round(now - seen) if seen else None,
+                     "memory_writes": sum(writes.get(n, 0) for n in a["emits"])})
+    return {"working": working, "total": len(ROSTER), "shift_phase": _state["phase"], "agents": rows, "demo_names": True}
 
 
 def _phase(phase: str, deal_id: str | None = None) -> None:

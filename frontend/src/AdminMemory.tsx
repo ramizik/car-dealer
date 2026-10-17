@@ -11,7 +11,7 @@ type Data = {
   llm: Record<string, { calls: number; errors: number }>;
   youcom: { calls: number; cache_hits: number; errors: number; demo_mode: boolean };
   agents: { working: number; total: number; shift_phase: string; demo_names: boolean;
-            agents: { name: string; role: string; status: "working" | "idle" }[] };
+            agents: { name: string; role: string; status: "working" | "idle"; last_seen_s: number | null; memory_writes: number }[] };
 };
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -81,18 +81,20 @@ export default function AdminMemory() {
           <div className="stat"><span className="value">{data.agents.shift_phase}</span><span className="label">Shift phase</span></div>
         </div>
         <table className="list">
-          <thead><tr><th>Name (demo)</th><th>Role</th><th>Status</th></tr></thead>
+          <thead><tr><th>Name (demo)</th><th>Role</th><th>Status</th><th>Last activity</th><th>Memory writes</th></tr></thead>
           <tbody>
             {data.agents.agents.map((a) => (
               <tr key={a.name}>
                 <td data-label="Name">{a.name}</td>
                 <td data-label="Role">{a.role}</td>
                 <td data-label="Status" className={a.status === "working" ? "good" : "muted"}>{a.status}</td>
+                <td data-label="Last activity">{a.last_seen_s === null ? "never" : a.last_seen_s < 60 ? `${a.last_seen_s}s ago` : `${Math.round(a.last_seen_s / 60)} min ago`}</td>
+                <td data-label="Memory writes" className="num">{a.memory_writes.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="small muted">Names are demo labels for the agents. The status is live from the shift and the deals.</p>
+        <p className="small muted">Names are demo labels. "Working" means the agent logged something in the last two minutes or the shift is in its phase. Agents only act while a shift runs.</p>
       </section>
 
       <section className="stack-sm" aria-labelledby="cost-head">
