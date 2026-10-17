@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-// Owner-only page at /admin?token=... Not linked from the dealer app. The backend checks the token.
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 type Arm = { n: number; close_rate: number; mean_saved_pct: number; surplus_captured_pct: number; mean_rounds: number; scams_blocked: number; scams: number };
@@ -17,44 +16,26 @@ type Data = {
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 export default function AdminMemory() {
-  // The token can come from the link or be typed here. It is kept in memory only, never stored.
-  const [token, setToken] = useState(() => new URLSearchParams(window.location.search).get("token") ?? "");
-  const [draft, setDraft] = useState("");
+  // Not linked from the dealer app. Opened by typing /admin in the address bar.
   const [data, setData] = useState<Data | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "ok" | "denied" | "offline">(token ? "loading" : "idle");
+  const [state, setState] = useState<"loading" | "ok" | "offline">("loading");
 
   useEffect(() => {
-    if (!token) return;
-    setState("loading");
-    fetch(`${API}/admin/memory?token=${encodeURIComponent(token)}`)
+    fetch(`${API}/admin/memory`)
       .then(async (r) => {
-        if (r.status === 403) return setState("denied");
         if (!r.ok) return setState("offline");
         setData(await r.json());
         setState("ok");
       })
       .catch(() => setState("offline"));
-  }, [token]);
+  }, []);
 
   if (state !== "ok" || !data) {
     return (
       <main className="content stack">
         <h1>Admin: memory and cost</h1>
-        {state !== "loading" && (
-          <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); setToken(draft.trim()); }}>
-            <label htmlFor="admin-token">Admin token</label>
-            <div className="row">
-              <input id="admin-token" type="password" autoComplete="off" value={draft}
-                onChange={(e) => setDraft(e.target.value)} placeholder="Paste your admin token"
-                style={{ minWidth: 280, minHeight: 40, padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-strong)", font: "inherit" }} />
-              <button className="primary" type="submit" disabled={!draft.trim()}>Open</button>
-            </div>
-          </form>
-        )}
         <p className="muted">
           {state === "loading" && "Loading…"}
-          {state === "idle" && "Enter the admin token to open this page."}
-          {state === "denied" && "That token isn't accepted. Check it and try again."}
           {state === "offline" && "Can't reach the backend."}
         </p>
       </main>

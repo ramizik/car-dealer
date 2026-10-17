@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 import html  # noqa: E402
-import hmac  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -263,11 +262,8 @@ def onboarding_questions():
 
 
 @app.get("/admin/memory")
-def admin_memory(token: str = ""):
-    """Owner-only view of memory and cost. Off unless ADMIN_TOKEN is set in .env and the token matches."""
-    expected = os.getenv("ADMIN_TOKEN", "")
-    if not expected or not hmac.compare_digest(token.encode(), expected.encode()):
-        return JSONResponse({"error": "forbidden"}, status_code=403)
+def admin_memory():
+    """Admin view of memory and cost. Not linked from the dealer app; no token check."""
     try:
         ev = json.loads((Path(__file__).parent / "data" / "eval_result.json").read_text(encoding="utf-8"))
     except Exception:
