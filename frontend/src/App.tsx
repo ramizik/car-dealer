@@ -175,9 +175,10 @@ export default function App() {
     { label: "Worth about", render: (d) => money(d.valuation?.mid), numeric: true },
   ];
   const inventoryFilters: Filter[] = [
-    { id: "all", label: "All", states: ["bought", "in_transit", "delivered"] },
+    // A car stays in Inventory until it is sold, including while it is listed or a sale is waiting for an OK.
+    { id: "all", label: "All", states: ["bought", "in_transit", "delivered", "listed", "awaiting_sale"] },
     { id: "way", label: "On the way", states: ["bought", "in_transit"] },
-    { id: "lot", label: "On the lot", states: ["delivered"] },
+    { id: "lot", label: "On the lot", states: ["delivered", "listed", "awaiting_sale"] },
   ];
 
   const sellingCols: Column[] = [
