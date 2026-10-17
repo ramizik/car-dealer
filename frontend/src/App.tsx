@@ -55,8 +55,8 @@ export default function App() {
     refresh();
   };
 
-  const startShift = async (n: number) => {
-    await api.startShift(n);
+  const startShift = async (n: number, live = false) => {
+    await api.startShift(n, live);
     refresh();
   };
   const stopShift = async () => {

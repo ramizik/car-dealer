@@ -10,7 +10,7 @@ type Props = {
   events: AgentEvent[];
   brain: Brain | null;
   evalResult: EvalResult | null;
-  onStart: (n: number) => void;
+  onStart: (n: number, live: boolean) => void;
   onStop: () => void;
   onOpen: (id: string) => void;
   onDecide: (id: string, yes: boolean) => void;
@@ -60,6 +60,7 @@ function useNow() {
 export default function ShiftView({ health, deals, events, brain, evalResult, onStart, onStop, onOpen, onDecide, onInsights }: Props) {
   const now = useNow();
   const [size, setSize] = useState(5);
+  const [live, setLive] = useState(false);
   const shift = health?.shift;
   const running = Boolean(shift?.running);
   const started = shift?.started ?? null;
@@ -82,6 +83,7 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
 
   const approvals = deals.filter((d) => d.state === "awaiting_approval");
   const current = deals.find((d) => d.id === shift?.deal);
+  const waitingOnYou = deals.find((d) => d.turn?.who === "seller");
   const last = events[events.length - 1];
 
   const decisions = [...shiftEvents].reverse().filter(
@@ -124,6 +126,11 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
           <div className="progress big" role="img" aria-label="Shift progress">
             <div style={{ width: `${shift?.cap ? Math.min(100, (shift.n / shift.cap) * 100) : 0}%` }} className={running ? "live" : ""} />
           </div>
+          {waitingOnYou && (
+            <button className="turn-callout" onClick={() => onOpen(waitingOnYou.id)}>
+              <span className="turn-pill">YOUR TURN</span> The seller in {waitingOnYou.id} is waiting for you. Open the deal
+            </button>
+          )}
           {running ? (
             <button onClick={onStop}>Stop shift</button>
           ) : (
@@ -132,7 +139,10 @@ export default function ShiftView({ health, deals, events, brain, evalResult, on
               <select id="shift-size" value={size} onChange={(e) => setSize(Number(e.target.value))} disabled={!health}>
                 {[3, 5, 10, 20, 0].map((n) => <option key={n} value={n}>{n ? `${n} deals` : "Until I stop it"}</option>)}
               </select>
-              <button className="primary" onClick={() => onStart(size)} disabled={!health}>Start shift</button>
+              <label className="check small" title="The first car's seller calls, and you answer in the browser with the mic or by typing.">
+                <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} disabled={!health} /> I answer as the first seller
+              </label>
+              <button className="primary" onClick={() => onStart(size, live)} disabled={!health}>Start shift</button>
             </div>
           )}
         </div>

@@ -27,6 +27,18 @@ async function post(path: string, body?: unknown): Promise<boolean> {
   }
 }
 
+// Seller answers: the backend replies {ok, error?}. Speech can take a few seconds, so the timeout is longer.
+type AnswerResult = { ok: boolean; error?: string };
+async function answer(path: string, init: RequestInit): Promise<AnswerResult> {
+  try {
+    const r = await fetch(`${API}${path}`, { method: "POST", ...init, signal: AbortSignal.timeout(30000) });
+    const body = (await r.json().catch(() => ({}))) as AnswerResult;
+    return r.ok ? body : { ok: false, error: body.error ?? `HTTP ${r.status}` };
+  } catch {
+    return { ok: false, error: "Backend unreachable" };
+  }
+}
+
 export const api = {
   health: () => get<Health>("/health"),
   deals: () => get<Deal[]>("/deals"),
@@ -35,9 +47,14 @@ export const api = {
   eval: () => get<EvalResult>("/eval"),
   saveSetup: (answers: Record<string, string[]>) => post("/onboarding/answers", { answers }),
   onboardingQuestions: async () => (await get<OnboardingQuestion[]>("/onboarding/questions")) ?? [],
-  startShift: (max_deals: number) => post("/shift/start", { max_deals }),
+  startShift: (max_deals: number, live = false) => post("/shift/start", { max_deals, live }),
   stopShift: () => post("/shift/stop"),
   approve: (id: string, yes: boolean, car = "", reason = "") => post(`/deals/${id}/approve`, { yes, car, reason }),
+  sendSellerAudio: (id: string, wav: Blob) =>
+    answer(`/deals/${id}/seller-audio`, { body: wav, headers: { "Content-Type": "audio/wav" } }),
+  sendSellerText: (id: string, text: string) =>
+    answer(`/deals/${id}/seller-text`, { body: JSON.stringify({ text }), headers: { "Content-Type": "application/json" } }),
+  clipUrl: (path: string) => `${API}${path}`,
   runEval: () => post("/eval/run"),
   storefrontUrl: `${API}/storefront`,
   loadSnapshot: (name: "cold" | "warm") => post(`/brain/load/${name}`),

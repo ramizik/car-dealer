@@ -15,6 +15,7 @@ from pathlib import Path
 import agents
 import conversations
 import librarian
+import live
 import memory_layer
 import brain
 import llm
@@ -31,7 +32,7 @@ DEALS: dict[str, dict] = {}
 EVENTS: list[dict] = []
 _SC: dict[str, dict] = {}  # deal id -> scenario (hidden buyer lives here)
 _state = {"running": False, "task": None, "seed": 0, "n": 0, "cap": 0, "started": None, "ended": None,
-          "phase": "idle", "deal": None, "continuous": False}
+          "phase": "idle", "deal": None, "continuous": False, "live": False, "live_done": False}
 STATE_FILE = Path(__file__).parent / "data" / "state.json"
 _tasks: set = set()  # after-buy pipelines running alongside the next negotiation
 
@@ -59,6 +60,7 @@ def _restore() -> None:
     _SC.update(d.get("scenarios", {}))
     _state.update(d.get("state", {}))
     for deal in DEALS.values():  # work cut off mid-negotiation can't be resumed honestly
+        deal["turn"] = None
         if deal["state"] in ("sourced", "appraised", "negotiating"):
             deal.update(state="dropped", drop_reason="backend restarted mid-negotiation")
 
@@ -111,7 +113,7 @@ youcom.listeners.append(_on_youcom)
 
 
 def status() -> dict:
-    return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal", "continuous")} | {
+    return {k: _state[k] for k in ("running", "n", "cap", "started", "ended", "phase", "deal", "continuous", "live")} | {
         "background": len(_tasks)}
 
 
@@ -124,13 +126,7 @@ def _title(l: dict) -> str:
 
 
 def _chat(result: dict) -> list[dict]:
-    out = []
-    for t in result.get("transcript", []):
-        if t["from"] not in ("agent", "seller") or not t.get("text"):
-            continue
-        out.append({k: v for k, v in {"from": t["from"], "text": t["text"], "tactic": t.get("tactic"),
-                                      "channel": t.get("channel"), "recalled": t.get("recalled") or None}.items() if v})
-    return out
+    return [agents.bubble(t) for t in result.get("transcript", []) if t["from"] in ("agent", "seller") and t.get("text")]
 
 
 APPRAISE_SYSTEM = ("Extract a used-car market value from research text. Return JSON "
@@ -235,6 +231,7 @@ async def approve(deal_id: str, yes: bool, reason: str = "") -> bool:
     deal = DEALS.get(deal_id)
     if not deal or deal["state"] != "awaiting_approval":
         return False
+    deal["turn"] = None
     if not yes:
         deal.update(state="dropped", drop_reason=reason or "owner declined")
         emit("owner", "state", f"Declined {deal['car']}", {"deal_id": deal_id})
@@ -287,9 +284,14 @@ async def _one(i: int, sc: dict) -> None:
     max_buy = sc["seller"]["ask"] * 1.0
     if max_buy > dealer_profile.get()["buy_limit"]:
         return False  # over the dealer's spend limit, not worth a deal row
+    # Live shift: the first deal's seller is a person answering in the browser; the rest are simulated.
+    is_live = bool(_state["live"]) and not _state["live_done"]
+    if is_live:
+        _state["live_done"] = True
     deal = {"id": deal_id, "car": _title(listing), "location": listing.get("city", ""), "state": "sourced",
             "asking": sc["seller"]["ask"], "max_buy": round(max_buy), "listing_url": listing.get("url"),
-            "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []}, "chat": []}
+            "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []},
+            "chat": [], "live": is_live, "turn": None}
     DEALS[deal_id], _SC[deal_id] = deal, sc
     emit("scout", "state", f"Found {deal['car']} in {deal['location']}, asking ${deal['asking']:,}", {"deal_id": deal_id})
     _phase("valuing", deal_id)
@@ -298,9 +300,14 @@ async def _one(i: int, sc: dict) -> None:
     await asyncio.sleep(0.3)
     deal["state"] = "negotiating"
     _phase("negotiating", deal_id)
+    seller = live.LiveSeller(deal, sim.make_seller(sc), emit) if is_live else sim.make_seller(sc)
+    if is_live:
+        deal["turn"] = {"who": "system", "action": "call", "since": time.time()}
     r = await agents.negotiate({"id": deal_id, "ask": deal["asking"], "max_buy": max_buy, "seller_id": sc["seller"]["sid"],
-                                "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto"},
-                               sim.make_seller(sc), emit=emit)
+                                "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto", "voice": is_live,
+                                "chat_sink": deal["chat"]},
+                               seller, emit=emit)
+    deal["turn"] = None
     deal["chat"] = _chat(r)
     # Write-ahead: squeeze the chat into one artifact + status for the shared brain; raw chat stays private.
     mem = await memory_layer.consolidate("negotiator", f"seller:{sc['seller']['sid']}", deal_id, r, deal["car"])
@@ -312,6 +319,7 @@ async def _one(i: int, sc: dict) -> None:
     deal["offer"] = int(r["price"])
     deal["_resale"] = (r.get("resale_quote") or {}).get("resale_price")
     deal["state"] = "awaiting_approval"
+    deal["turn"] = {"who": "owner", "action": "approve", "since": time.time()}
     _phase("waiting for owner", deal_id)
     emit("negotiator", "approval", f"{deal['car']}: agreed ${deal['offer']:,}, needs your OK", {"deal_id": deal_id})
     save()
@@ -371,10 +379,11 @@ async def _run(max_deals: int) -> None:
         _phase("idle")
 
 
-def start(max_deals: int = 5) -> bool:
+def start(max_deals: int = 5, live_seller: bool = False) -> bool:
     if _state["running"]:
         return False
     _state["running"] = True
+    _state["live"], _state["live_done"] = live_seller, False
     _state["task"] = asyncio.get_running_loop().create_task(_run(max_deals))
     return True
 

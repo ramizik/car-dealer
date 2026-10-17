@@ -424,3 +424,24 @@ table.mini th, table.mini td { padding: 8px 12px; }
 .lean .bar { max-width: 260px; }
 .listing-copy { padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); font-size: 14px; }
 .listing-copy ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Whose turn it is (live seller). Colour is never the only cue: each state also has a text pill and a step track. */
+.turn { margin: 12px 0; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); }
+.turn-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.turn-pill { font-weight: 700; font-size: 12px; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; background: var(--line); color: var(--ink); }
+.turn-track { display: flex; gap: 6px; list-style: none; margin: 10px 0 0; padding: 0; }
+.turn-track li { flex: 1; text-align: center; font-size: 12px; padding: 5px 0; border-radius: 6px; background: #f0f0f3; color: var(--ink-3); }
+.turn-track li.done { background: var(--line-strong); color: var(--ink); }
+.turn-track li.now { background: var(--ink); color: #fff; font-weight: 700; }
+.turn-seller { background: var(--attn-soft); border-color: var(--attn-line); }
+.turn-seller .turn-pill { background: var(--attn); color: #fff; }
+.turn-owner { background: var(--brand-soft); border-color: var(--brand); }
+.turn-owner .turn-pill { background: var(--brand); color: #fff; }
+.turn-agent .turn-pill { background: var(--ok-soft); color: var(--ok); }
+.seller-turn { margin: 12px 0; padding: 14px; border-radius: var(--radius-sm); border: 2px solid var(--attn); background: var(--surface); }
+.seller-turn h3 { margin-bottom: 4px; }
+.big-mic { width: 100%; padding: 14px; font-size: 16px; margin: 8px 0; }
+.turn-callout { width: 100%; text-align: left; margin-bottom: 10px; padding: 10px 12px; border: 2px solid var(--attn); background: var(--attn-soft); border-radius: var(--radius-sm); }
+.turn-callout .turn-pill { background: var(--attn); color: #fff; margin-right: 6px; }
+.check { display: inline-flex; align-items: center; gap: 6px; }
+.bubble audio { margin-top: 8px; width: 100%; }

@@ -33,7 +33,16 @@ export type ChatTurn = {
   recalled?: string[];
   tactic?: string;
   channel?: string;
+  audio_url?: string;
 };
+
+// Whose move it is on a live deal. Null means nobody is waiting: the team is working.
+export type Turn = {
+  who: "system" | "seller" | "owner";
+  action: "call" | "answer" | "reply" | "approve";
+  since: number;
+  offer?: number;
+} | null;
 
 export type Deal = {
   id: string;
@@ -48,6 +57,8 @@ export type Deal = {
   sold_for?: number;
   valuation?: { low: number; mid: number; high: number; citations: Citation[] };
   chat: ChatTurn[];
+  live?: boolean;
+  turn?: Turn;
   drop_reason?: string;
   listing_url?: string;
   shipping?: number;
@@ -64,6 +75,7 @@ export type ShiftStatus = {
   phase: string;
   deal: string | null;
   continuous?: boolean;
+  live?: boolean;
   background?: number;
 };
 

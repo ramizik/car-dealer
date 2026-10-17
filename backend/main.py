@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Request  # noqa: E402
-from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
+from fastapi.responses import HTMLResponse, JSONResponse, Response  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -21,12 +21,12 @@ import swarm  # noqa: E402
 import youcom  # noqa: E402
 import memory  # noqa: E402
 import librarian  # noqa: E402
-import phone  # noqa: E402
+import live  # noqa: E402
+import voice  # noqa: E402
 from onboarding import QUESTIONS  # noqa: E402
 
 app = FastAPI(title="dealer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-app.include_router(phone.router)  # Twilio phone calls: /twilio/*
 
 
 @app.on_event("startup")
@@ -92,6 +92,7 @@ def run_eval():
 
 class ShiftReq(BaseModel):
     max_deals: int = 5  # 0 = continuous: the team keeps working until /shift/stop
+    live: bool = False  # the first deal's seller is answered by a person in the browser
 
 
 @app.post("/shift/start")
@@ -99,7 +100,7 @@ async def shift_start(req: ShiftReq = ShiftReq()):
     n = 0 if req.max_deals <= 0 else min(req.max_deals, 20)
     if _eval_running():
         return {"started": False, "error": "eval is running, try again in a few seconds"}
-    return {"started": swarm.start(n), "continuous": n == 0}
+    return {"started": swarm.start(n, live_seller=req.live), "continuous": n == 0, "live": req.live}
 
 
 @app.post("/shift/stop")
@@ -159,6 +160,34 @@ class DecisionReq(BaseModel):
     yes: bool
     car: str = ""
     reason: str = ""
+
+
+class SellerTextReq(BaseModel):
+    text: str
+
+
+@app.post("/deals/{deal_id}/seller-audio")
+async def seller_audio(deal_id: str, request: Request):
+    """Browser sends the seller's recorded answer (WAV). Parakeet transcribes it, then the negotiator reads it."""
+    if deal_id not in live.PENDING:
+        return {"ok": False, "error": "not waiting for a seller answer"}
+    heard = voice.transcribe(await request.body())
+    if heard is None:
+        return {"ok": False, "error": "speech is off (no NVIDIA key), type the answer instead"}
+    return live.answer(deal_id, heard)
+
+
+@app.post("/deals/{deal_id}/seller-text")
+def seller_text(deal_id: str, req: SellerTextReq):
+    """Typed fallback for the seller's answer."""
+    return live.answer(deal_id, req.text)
+
+
+@app.get("/clips/{cid}.wav")
+def clip(cid: str):
+    """Agent speech for the browser player."""
+    wav = voice.CLIPS.get(cid)
+    return Response(wav, media_type="audio/wav") if wav else JSONResponse(status_code=404, content={"error": "not found"})
 
 
 class FlagReq(BaseModel):

@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
+import { api } from "./api";
 import { STAGES, money, profit, time } from "./format";
 import type { AgentEvent, Deal } from "./types";
 import { CHANNEL_LABELS } from "./channels";
+import SellerTurn from "./SellerTurn";
+import TurnBanner from "./TurnBanner";
 
 type Props = {
   deal: Deal;
@@ -17,6 +20,7 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
   const history = events.filter((e) => e.deal_id === deal.id && e.type !== "recall" && e.type !== "write");
   const stopped = deal.state === "dropped";
   const memory = events.filter((e) => e.deal_id === deal.id && e.type === "write" && typeof e.data.artifact === "string");
+  const lastAudio = deal.chat.map((t) => Boolean(t.audio_url)).lastIndexOf(true);
 
   // Escape closes, and focus starts on the close button so keyboard users are not lost behind the scrim.
   useEffect(() => {
@@ -51,6 +55,9 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
             </div>
           </>
         )}
+
+        {!stopped && (deal.live || deal.turn) && <TurnBanner deal={deal} />}
+        {!stopped && deal.turn?.who === "seller" && <SellerTurn dealId={deal.id} offer={deal.turn.offer} />}
 
         {deal.state === "awaiting_approval" && (
           <section aria-label="Decision needed">
@@ -109,6 +116,10 @@ export default function DealPanel({ deal, events, onClose, onDecide }: Props) {
                     {t.tactic && <span className="tag">{t.tactic.replace(/_/g, " ")}</span>}
                   </span>
                   <p>{t.text}</p>
+                  {t.audio_url && (
+                    // Autoplay only the newest clip while the agent's line is the one just spoken; browsers may still block it.
+                    <audio controls preload="auto" src={api.clipUrl(t.audio_url)} autoPlay={i === lastAudio && deal.turn?.who === "seller"} />
+                  )}
                   {t.recalled && t.recalled.length > 0 && (
                     <div className="memory">
                       Based on past deals

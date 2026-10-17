@@ -2,7 +2,6 @@
 
 Prices are decided in code (deterministic, clamped to max_buy); the LLM only writes the words.
 """
-import base64
 import inspect
 import os
 import random
@@ -131,6 +130,18 @@ def _ask_seller_agent(deal: dict, buy_price: float, emit, deal_id: str) -> dict:
     return q
 
 
+def bubble(t: dict) -> dict:
+    """A transcript line as the dashboard chat shows it."""
+    return {k: v for k, v in {"from": t["from"], "text": t["text"], "tactic": t.get("tactic"), "channel": t.get("channel"),
+                              "recalled": t.get("recalled") or None, "audio_url": t.get("audio_url")}.items() if v}
+
+
+def show(deal: dict, t: dict) -> None:
+    """Live deals: each line reaches the deal's chat as it is said, so the browser sees the call in progress."""
+    if deal.get("chat_sink") is not None and t.get("text") and t["from"] in ("agent", "seller"):
+        deal["chat_sink"].append(bubble(t))
+
+
 async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, rng=None) -> dict:
     """Buy-side negotiation, <= MAX_ROUNDS. `seller.respond(offer, tactic) -> (accepted, counter, text)`.
 
@@ -218,8 +229,9 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         conversations.append(party, "agent", msg, tag=f"${offer:,.0f}, {tactic}, {channel}")
         entry = {"from": "agent", "text": msg, "channel": channel, "offer": offer, "tactic": tactic, "recalled": memory[:6] if r == 0 else []}
         if voice_on and (audio := voice.speak(msg)):
-            entry["audio_b64"] = base64.b64encode(audio).decode()
+            entry["audio_url"] = voice.clip_url(voice.to_wav(audio, 44100))
         transcript.append(entry)
+        show(deal, entry)
         emit("negotiator", "message", msg, {"deal_id": deal_id, "offer": offer, "tactic": tactic, "channel": channel})
 
         reply = seller.respond(int(offer), tactic)
@@ -227,6 +239,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
         if seller_text:
             conversations.append(party, "seller", seller_text)
         transcript.append({"from": "seller", "text": seller_text, "counter": counter})
+        show(deal, transcript[-1])
         emit("seller", "message", seller_text, {"deal_id": deal_id, "counter": counter})
 
         if re.search(r"https?://", seller_text or ""):

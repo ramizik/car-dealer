@@ -7,10 +7,13 @@ No real call is placed from this module; it only records a call request.
 Without NVIDIA_API_KEY, transcribe() and speak() return None so the caller can fall back to text.
 Function IDs come from NVCF at runtime (see .claude/skills/nemotron-speech); override with env.
 """
+import io
 import json
 import os
 import re
 import urllib.request
+import uuid
+import wave
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 SERVER = os.getenv("NVIDIA_SPEECH_SERVER", "grpc.nvcf.nvidia.com:443")
@@ -74,13 +77,40 @@ def _auth(fid: str):
     return riva.client.Auth(uri=SERVER, use_ssl=True, metadata_args=md)
 
 
-def transcribe(wav: bytes, sample_rate_hz: int = 16000) -> str | None:
-    """Parakeet ASR on a WAV clip. Returns the transcript, or None when offline or on error."""
+def to_wav(pcm: bytes, sample_rate_hz: int) -> bytes:
+    """Wrap 16-bit mono LINEAR_PCM in a WAV header so the browser can play it."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate_hz)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+# Clips the browser plays (agent speech). In memory only, newest kept, so state.json stays small.
+CLIPS: dict[str, bytes] = {}
+
+
+def clip_url(wav: bytes) -> str:
+    """Store a WAV clip and return the path the frontend fetches it from."""
+    cid = uuid.uuid4().hex
+    CLIPS[cid] = wav
+    for old in list(CLIPS)[:-200]:
+        CLIPS.pop(old, None)
+    return f"/clips/{cid}.wav"
+
+
+def transcribe(audio: bytes, sample_rate_hz: int = 16000) -> str | None:
+    """Parakeet ASR. Takes a WAV file (from the browser) or raw 16-bit mono PCM. Returns the transcript, or None when offline or on error."""
     if not NVIDIA_API_KEY:
         return None
     try:
         import riva.client
 
+        if audio[:4] == b"RIFF":
+            with wave.open(io.BytesIO(audio)) as w:
+                audio, sample_rate_hz = w.readframes(w.getnframes()), w.getframerate()
         fid = _function_id(ASR_MODEL)
         if not fid:
             return None
@@ -92,7 +122,7 @@ def transcribe(wav: bytes, sample_rate_hz: int = 16000) -> str | None:
             max_alternatives=1,
             enable_automatic_punctuation=True,
         )
-        resp = asr.offline_recognize(wav, cfg)  # Parakeet CTC serves offline recognition for short clips
+        resp = asr.offline_recognize(audio, cfg)  # Parakeet CTC serves offline recognition for short clips
         return resp.results[0].alternatives[0].transcript if resp.results else ""
     except Exception:
         return None
