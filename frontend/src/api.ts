@@ -36,6 +36,7 @@ export const api = {
   events: () => get<AgentEvent[]>("/events?since=0", fx.events),
   brain: () => get<Brain>("/brain", fx.brain),
   eval: () => get<EvalResult>("/eval", fx.evalResult),
+  saveSetup: (answers: Record<string, string[]>) => post("/onboarding/answers", { answers }),
   onboardingQuestions: () => get<OnboardingQuestion[]>("/onboarding/questions", []),
   startShift: () => post("/shift/start", { max_deals: 5 }),
   stopShift: () => post("/shift/stop"),

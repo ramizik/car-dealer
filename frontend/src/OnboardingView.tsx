@@ -11,6 +11,7 @@ export default function OnboardingView() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [done, setDone] = useState(false);
+  const [saved, setSaved] = useState(true);
 
   useEffect(() => {
     api.onboardingQuestions().then((r) => {
@@ -29,7 +30,11 @@ export default function OnboardingView() {
     return (
       <section className="done" aria-live="polite">
         <h2>You're set up</h2>
-        <p>We'll use these choices from now on. You can change them any time.</p>
+        <p>
+          {saved
+            ? "We'll use these choices from now on, including your spending limit and minimum profit. You can change them any time."
+            : "We couldn't save your choices just now. They're kept on this screen; try Finish again in a moment."}
+        </p>
         <button onClick={() => { setStep(0); setDone(false); }}>Review my answers</button>
       </section>
     );
@@ -53,10 +58,11 @@ export default function OnboardingView() {
     setAnswers((a) => ({ ...a, [q.id]: q.options.filter((o) => o.recommended).map((o) => o.value) }));
   };
 
-  const next = () => {
+  const next = async () => {
     if (!picked.length) return;
-    if (isLast) setDone(true);
-    else setStep(step + 1);
+    if (!isLast) return setStep(step + 1);
+    setSaved(await api.saveSetup(answers));
+    setDone(true);
   };
 
   return (

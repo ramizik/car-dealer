@@ -14,6 +14,46 @@ QUESTIONS = [
         ],
     },
     {
+        "id": "services",
+        "ask": "What should we do for you?",
+        "type": "multi",
+        "options": [
+            {"value": "buy", "label": "Buy cars for me", "recommended": True},
+            {"value": "sell", "label": "Sell my cars", "recommended": True},
+        ],
+    },
+    {
+        "id": "decision_mode",
+        "ask": "Who makes the final call?",
+        "type": "single",
+        "options": [
+            {"value": "dealer_decides", "label": "You find and negotiate, I make the final call", "recommended": True},
+            {"value": "within_limits", "label": "Go ahead on your own within my limits"},
+        ],
+    },
+    {
+        "id": "buy_limit",
+        "ask": "Most we can spend on one car?",
+        "type": "single",
+        "options": [
+            {"value": "15000", "label": "Up to $15,000"},
+            {"value": "30000", "label": "Up to $30,000", "recommended": True},
+            {"value": "50000", "label": "Up to $50,000"},
+            {"value": "75000", "label": "Up to $75,000"},
+        ],
+    },
+    {
+        "id": "min_profit",
+        "ask": "Lowest profit you'll accept when we sell a car?",
+        "type": "single",
+        "options": [
+            {"value": "1000", "label": "$1,000 per car"},
+            {"value": "1500", "label": "$1,500 per car", "recommended": True},
+            {"value": "2500", "label": "$2,500 per car"},
+            {"value": "4000", "label": "$4,000 per car"},
+        ],
+    },
+    {
         "id": "car_segments",
         "ask": "What kind of cars do you deal in?",
         "type": "multi",

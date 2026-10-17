@@ -11,6 +11,7 @@ import re
 import brain
 import conversations
 import dealer_memory
+import dealer_profile
 import llm
 import outreach
 import seller_agent
@@ -160,6 +161,16 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
     if isinstance(last, (int, float)):
         cap = min(cap, ask * float(last))
 
+    # The dealer's setup: only buy if they asked us to, and never above their per-car limit.
+    profile = dealer_profile.get()
+    if "buy" not in profile["services"]:
+        dropped = "dealer setup: buying is turned off"
+        emit("negotiator", "state", f"Dropped {deal_id}: {dropped}", {"deal_id": deal_id, "closed": False, "price": None})
+        return {"deal_id": deal_id, "closed": False, "price": None, "rounds": 0, "tactic": tactic, "segment": segment,
+                "ask": ask, "max_buy": max_buy, "dropped": dropped, "transcript": [], "recalled": memory}
+    max_buy = min(max_buy, profile["buy_limit"])
+    cap = min(cap, max_buy)
+
     # Learned from the dealer: stop bidding on models they keep declining.
     skip, why = dealer_memory.should_skip(deal.get("car") or deal.get("listing", {}).get("title", ""))
     if skip:
@@ -170,7 +181,7 @@ async def negotiate(deal: dict, seller, epsilon: float = 0.0, emit=_noop_emit, r
 
     # Coordinate with the seller agent before spending: resale price, days to sell, profit at our max.
     q = _ask_seller_agent(deal, max_buy, emit, deal_id)
-    profit_cap = (q["resale_price"] - seller_agent.RECON - seller_agent.MIN_PROFIT) if q["resale_price"] else None
+    profit_cap = (q["resale_price"] - seller_agent.RECON - seller_agent.min_profit()) if q["resale_price"] else None
     too_slow = bool(q["days_to_sell"] and q["days_to_sell"] > seller_agent.MAX_DAYS)
     no_margin = profit_cap is not None and profit_cap < ask * OPEN_PCT * 0.8  # can't profit at any realistic offer
     if too_slow or no_margin:

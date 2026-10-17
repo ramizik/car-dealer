@@ -8,6 +8,7 @@ reply says which numbers were estimated.
 """
 import brain
 import dealer_memory
+import dealer_profile
 
 
 def usd(n: float) -> str:
@@ -18,7 +19,7 @@ SELL_FACTOR = 0.97  # expected sale vs retail mid: listed near retail, some nego
 RECON = 800  # detailing and minor repairs per car until real recon data exists
 DEFAULT_DAYS = 30  # used only when the brain has no sales history for this model
 MIN_SALES_FOR_DAYS = 3  # below this, the default is used and labelled as such
-MIN_PROFIT = 1500  # dollars the buyer must clear
+MIN_PROFIT = 1500  # fallback; the dealer sets their own in setup
 MAX_DAYS = 45  # slower sellers than this are passed on
 
 
@@ -37,6 +38,11 @@ def days_to_sell(key: str) -> tuple[float, str]:
     return DEFAULT_DAYS, "default, not enough sales history"
 
 
+def min_profit() -> float:
+    """The dealer's lowest acceptable profit per car, from setup."""
+    return dealer_profile.get().get("min_profit", MIN_PROFIT)
+
+
 def quote(car: dict, buy_price: float) -> dict:
     retail = car.get("comps_mid") or car.get("retail_mid")
     if not retail:  # no market value yet: do not block the buy, say so
@@ -48,8 +54,9 @@ def quote(car: dict, buy_price: float) -> dict:
     days, source = days_to_sell(model_key(car))
 
     reasons = []
-    if profit < MIN_PROFIT:
-        reasons.append(f"profit {usd(profit)} is under the {usd(MIN_PROFIT)} minimum")
+    floor = min_profit()
+    if profit < floor:
+        reasons.append(f"profit {usd(profit)} is under your {usd(floor)} minimum")
     if days > MAX_DAYS:
         reasons.append(f"about {days:.0f} days to sell is over the {MAX_DAYS}-day limit")
     verdict = "pass" if reasons else "buy"
