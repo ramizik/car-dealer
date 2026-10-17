@@ -97,17 +97,17 @@ Plan A (backend inside the sandbox) is only worth it if Plan B is already workin
 Run the backend reachable from the sandbox:
 
 ```bash
-cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
+cd backend && uvicorn main:app --host 10.120.0.2 --port 8000   # DROPLET_PRIVATE_IP; add --host 0.0.0.0 only if the dashboard must reach it publicly
 ```
 
 Allow the concierge to reach it:
 
 ```bash
 nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-api-host.yaml \
-  --trusted-private-host host.openshell.internal --dry-run
+  --trusted-private-host 10.120.0.2 --dry-run
 nemoclaw dealer policy add --from-file nemoclaw/presets/dealer-api-host.yaml \
-  --trusted-private-host host.openshell.internal --yes
-nemoclaw dealer exec -- curl -s http://host.openshell.internal:8000/health
+  --trusted-private-host 10.120.0.2 --yes
+nemoclaw dealer exec -- curl -s http://10.120.0.2:8000/health
 ```
 
 If `host.openshell.internal` doesn't resolve, use `nemoclaw dealer hosts-add dealer-api <HOST_IP>` with the WSL host IP, then point the preset and skill at `dealer-api`, and repeat the check.

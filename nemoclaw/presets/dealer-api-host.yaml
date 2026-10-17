@@ -5,12 +5,12 @@
 #   (same command with --yes to apply)
 preset:
   name: dealer-api-host
-  description: "Dealer FastAPI backend on the host, port 8000"
+  description: "Dealer FastAPI backend on the droplet, port 8000"
 network_policies:
   dealer_api_host:
     name: dealer_api_host
     endpoints:
-      - host: host.openshell.internal
+      - host: 10.120.0.2
         port: 8000
         protocol: rest
         enforcement: enforce
