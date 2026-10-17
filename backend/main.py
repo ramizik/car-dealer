@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -16,6 +17,11 @@ from onboarding import QUESTIONS  # noqa: E402
 
 app = FastAPI(title="dealer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.exception_handler(Exception)
+async def _no_trace(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"error": type(exc).__name__})
 
 
 class RunReq(BaseModel):
@@ -46,6 +52,17 @@ def shift_stop():
 @app.get("/deals")
 def deals():
     return swarm.public_deals()
+
+
+@app.get("/deals/{deal_id}")
+def deal(deal_id: str):
+    d = next((x for x in swarm.public_deals() if x["id"] == deal_id), None)
+    return d or JSONResponse(status_code=404, content={"error": "not found"})
+
+
+@app.get("/briefing")
+def briefing():
+    return swarm.briefing()
 
 
 @app.get("/events")
@@ -84,6 +101,11 @@ class SetupReq(BaseModel):
 @app.post("/onboarding/answers")
 def save_setup(req: SetupReq):
     """Save the dealer's setup choices; buying and selling read them from the brain."""
+    return dealer_profile.save(req.answers)
+
+
+@app.put("/dealer")
+def put_dealer(req: SetupReq):
     return dealer_profile.save(req.answers)
 
 

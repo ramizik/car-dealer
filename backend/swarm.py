@@ -8,6 +8,11 @@ import random
 import time
 
 import agents
+import brain
+import llm
+import skills
+import youcom
+from agent_tiers import tier_for
 import dealer_profile
 import dealer_memory
 import seller_agent
@@ -41,6 +46,49 @@ def _chat(result: dict) -> list[dict]:
         out.append({k: v for k, v in {"from": t["from"], "text": t["text"], "tactic": t.get("tactic"),
                                       "channel": t.get("channel"), "recalled": t.get("recalled") or None}.items() if v})
     return out
+
+
+APPRAISE_SYSTEM = ("Extract a used-car market value from research text. Return JSON "
+                   '{"low": int, "mid": int, "high": int, "issues": [short strings]}. Dollars, no text.')
+
+
+async def _scout() -> None:
+    """Scout: real listing URLs via You.com (cache in DEMO_MODE), seed listings if search is empty."""
+    skills.load("buyer/marketplace")
+    try:
+        items = await youcom.find_listing_urls(dealer_profile.get() if isinstance(dealer_profile.get(), dict) else {}, limit=6)
+        found = await youcom.fetch_listings(items) if items else []
+    except Exception:
+        found = []
+    found = found or youcom.seed_listings()
+    for l in found[:6]:
+        brain.write("scout", "market", f"listing:{l.get('make', '')} {l.get('model', '')}".lower(), "obs",
+                    {"price": l.get("price"), "miles": l.get("miles"), "url": l.get("url")}, source=l.get("url") or "seed")
+    emit("scout", "state", f"Scanned market: {len(found)} live listings", {"count": len(found)})
+
+
+async def _appraise(deal: dict) -> None:
+    """Appraiser: You.com research (lite) -> Nano extracts a range; keeps the sim range if anything fails."""
+    skills.load("buyer/kbb")
+    key = f"value:{deal['car'].split(' · ')[0]}".lower()
+    known = brain.recall(["market"], keys=[key], agent="appraiser")
+    try:
+        r = await youcom.research(f"Current used market value range in USD for a {deal['car']}?", "lite")
+        if not r.get("content"):
+            raise ValueError("no research")
+        v = await llm.chat_json(APPRAISE_SYSTEM, r["content"][:4000], tier=tier_for("appraiser"))
+        lo, mid, hi = (int(v.get(k) or 0) for k in ("low", "mid", "high"))
+        if not (0 < lo <= mid <= hi) or abs(mid - deal["valuation"]["mid"]) > deal["valuation"]["mid"] * 0.6:
+            raise ValueError("implausible")  # sim prices rule the deal; research must roughly agree
+        deal["valuation"].update(low=lo, mid=mid, high=hi, issues=v.get("issues") or [])
+        deal["valuation"]["citations"] = r.get("sources", [])[:4]
+    except Exception:
+        pass
+    val = deal["valuation"]
+    brain.write("appraiser", "market", key, "obs", {"low": val["low"], "mid": val["mid"], "high": val["high"]},
+                source=(val["citations"][0]["url"] if val["citations"] else "comps"), confidence=0.6)
+    emit("appraiser", "state", f"Valued {deal['car']} at ${int(val['mid']):,}" + (f" ({len(known)} past notes)" if known else ""),
+         {"deal_id": deal["id"], "sources": len(val["citations"])})
 
 
 async def _sell(deal: dict, buyer: sim.Buyer) -> None:
@@ -95,6 +143,7 @@ async def _one(i: int, sc: dict) -> None:
             "valuation": {"low": round(comps * 0.94), "mid": comps, "high": round(comps * 1.06), "citations": []}, "chat": []}
     DEALS[deal_id], _SC[deal_id] = deal, sc
     emit("scout", "state", f"Found {deal['car']} in {deal['location']}, asking ${deal['asking']:,}", {"deal_id": deal_id})
+    await _appraise(deal)
     r = await agents.negotiate({"id": deal_id, "ask": deal["asking"], "max_buy": max_buy, "seller_id": sc["seller"]["sid"],
                                 "car": deal["car"], "comps_mid": comps, "dealer": "Joe's Auto"},
                                sim.make_seller(sc), emit=emit)
@@ -114,6 +163,10 @@ async def _run(max_deals: int) -> None:
     try:
         _state["seed"] += 1
         _state["cap"] = _state["n"] + max_deals
+        try:
+            await _scout()
+        except Exception as e:
+            emit("system", "error", f"Scout skipped: {type(e).__name__}", {})
         sc = sim.scenarios(_state["seed"], max_deals * 4)
         for sc_i in (sc["train"] + sc["heldout"]):
             if _state["n"] >= _state["cap"]:
@@ -144,3 +197,14 @@ def stop() -> None:
 
 def public_deals() -> list[dict]:
     return [{k: v for k, v in d.items() if not k.startswith("_")} for d in reversed(list(DEALS.values()))]
+
+
+def briefing() -> dict:
+    ds = list(DEALS.values())
+    sold = [d for d in ds if d["state"] == "sold"]
+    profit = sum(d["sold_for"] - d["bought_for"] for d in sold)
+    waiting = [d["id"] for d in ds if d["state"] == "awaiting_approval"]
+    text = (f"{len(ds)} deals worked, {len(sold)} sold for ${profit:,} profit, "
+            f"{len(waiting)} waiting for your OK.")
+    return {"text": text, "deals": len(ds), "sold": len(sold), "profit": profit, "awaiting": waiting,
+            "brain": brain.stats()}
