@@ -5,7 +5,8 @@ Hackathon agent team on Crusoe Managed Inference (Nemotron). Defines its own "do
 ## Run
 
 ```bash
-cp .env.example .env   # add CRUSOE_API_KEY
+cp .env.example .env   # add CRUSOE_API_KEY (Intelligence API key)
+cd backend && python crusoe_check.py   # verifies key + model tiers
 cd backend && pip install -r requirements.txt && uvicorn main:app --reload --port 8000
 cd frontend && npm install && npm run dev   # http://localhost:3000
 ```

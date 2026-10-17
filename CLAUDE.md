@@ -20,7 +20,7 @@ Act as a blunt hackathon CTO. Optimize for speed, demo stability, simplicity, ju
 ## Stack
 - Backend: FastAPI, single service, in `backend/`. In-memory/JSON storage only. No DB, no auth, no microservices.
 - Frontend: Vite + React + TypeScript in `frontend/`. useState only.
-- LLM: `backend/llm.py` wraps Crusoe via the `openai` SDK (`CRUSOE_BASE_URL`, `CRUSOE_MODEL`). Mock mode when `CRUSOE_API_KEY` is empty.
+- LLM: `backend/llm.py` wraps Crusoe via the `openai` SDK. Pick a tier, never a model ID: `llm.chat(..., tier="smart"|"fast"|"sim"|"vision")` (Super for leads/talk/appraisal, Nano for extraction, Lightning for sims/librarian, Nano Omni for photos). Model IDs live in `.env` (`CRUSOE_MODEL_*`). Built-in per-model RPM throttle + 429/503 backoff. Mock mode when `CRUSOE_API_KEY` is empty. Check setup: `cd backend && python crusoe_check.py`.
 
 ## Layout
 - `backend/loop.py` - define-done -> work -> verify -> decide loop
